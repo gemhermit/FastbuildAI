@@ -2,7 +2,7 @@
   <a href="http://nestjs.com/" target="blank"><img src="./apps/web/public/pwa-512x512.png" width="90" alt="Nest Logo" /></a>
 </p>
 
-<h1 align="center">FastbuildAI</h1>
+<h1 align="center">羲梦超级智能体</h1>
 
 <p align="center">
   快速构建您的 AI 应用
@@ -49,7 +49,7 @@ http://localhost:4090
 **默认超级管理员账号**  
 
 - **用户名：** `admin`  
-- **密码：** `FastbuildAI&123456`  
+- **密码：** `羲梦超级智能体&123456`  
 
 ## 功能特性
 

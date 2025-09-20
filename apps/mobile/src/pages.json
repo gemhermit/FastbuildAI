@@ -4,13 +4,13 @@
         {
             "path": "pages/index/index",
             "style": {
-                "navigationBarTitleText": "FastbuildAI"
+                "navigationBarTitleText": "羲梦超级智能体"
             }
         }
     ],
     "globalStyle": {
         "navigationBarTextStyle": "black",
-        "navigationBarTitleText": "FastbuildAI",
+        "navigationBarTitleText": "羲梦超级智能体",
         "navigationBarBackgroundColor": "#F8F8F8",
         "backgroundColor": "#F8F8F8"
     }

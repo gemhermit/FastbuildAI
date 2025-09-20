@@ -2,7 +2,7 @@
   <a href="http://nestjs.com/" target="blank"><img src="./apps/web/public/pwa-512x512.png" width="90" alt="Nest Logo" /></a>
 </p>
 
-<h1 align="center">FastbuildAI</h1>
+<h1 align="center">羲梦超级智能体</h1>
 
 <p align="center">
   Fast build your AI application
@@ -49,7 +49,7 @@ http://localhost:4090
 **Default Super Admin Account**  
 
 - **Username:** `admin`  
-- **Password:** `FastbuildAI&123456`  
+- **Password:** `羲梦超级智能体&123456`  
 
 ## Features
 

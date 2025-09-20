@@ -13,7 +13,7 @@
 <a href="https://stackblitz.com/github/antfu/vitesse-nuxt"><img src="https://developer.stackblitz.com/img/open_in_stackblitz.svg" alt=""></a>
 </p>
 
-# FastBuildAI Web Console
+# 羲梦超级智能体 Web Console
 
 基于 Nuxt 3 构建的现代化 AI 管理控制台，提供完整的 AI 代理、对话、数据集管理等功能。
 

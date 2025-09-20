@@ -17,7 +17,7 @@ defineOptions({
     name: "IndexPage",
 });
 
-const title = ref("Hello FastbuildAI");
+const title = ref("Hello 羲梦超级智能体");
 </script>
 
 <style>
