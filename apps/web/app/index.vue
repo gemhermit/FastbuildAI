@@ -286,16 +286,6 @@ definePageMeta({
                             "
                             >|</span
                         >
-                        <span class="space-x-1">
-                            <span>Powered by</span>
-                            <a
-                                class="text-primary font-bold"
-                                href="https://www.fastbuildai.com"
-                                target="_blank"
-                            >
-                                FastbuildAI
-                            </a>
-                        </span>
                     </div>
                 </div>
             </div>
