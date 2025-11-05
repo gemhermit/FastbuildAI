@@ -46,10 +46,10 @@ Once started, you can access the application at:
 http://localhost:4090
 ```
 
-**Default Super Admin Account**  
+**Default Super Admin Account**
 
-- **Username:** `admin`  
-- **Password:** `羲梦超级智能体&123456`  
+- **Username:** `admin`
+- **Password:** `FastbuildAI&123456`
 
 ## Features
 

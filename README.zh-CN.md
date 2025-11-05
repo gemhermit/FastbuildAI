@@ -46,10 +46,10 @@ docker compose -p fastbuildai --env-file ./.env.production.local -f ./docker/doc
 http://localhost:4090
 ```
 
-**默认超级管理员账号**  
+**默认超级管理员账号**
 
-- **用户名：** `admin`  
-- **密码：** `羲梦超级智能体&123456`  
+- **用户名：** `admin`
+- **密码：** `FastbuildAI&123`
 
 ## 功能特性
 
