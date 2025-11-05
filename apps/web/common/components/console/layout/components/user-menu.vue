@@ -254,7 +254,7 @@ const menuItems = computed<DropdownMenuItem[][]>(() => [
 <template>
     <!-- Sidebar模式的容器 -->
     <div class="flex flex-col gap-1" :class="collapsed ? 'px-1' : 'px-1.5'">
-        <div
+        <!-- <div
             v-if="controlsStore.consoleLayoutMode === 'side'"
             class="hover:bg-secondary dark:hover:bg-surface-800 flex cursor-pointer flex-col rounded-lg select-none"
         >
@@ -270,7 +270,7 @@ const menuItems = computed<DropdownMenuItem[][]>(() => [
                     }}</span>
                 </a>
             </div>
-        </div>
+        </div> -->
 
         <div
             class="hover:bg-secondary dark:hover:bg-surface-800 flex cursor-pointer flex-col rounded-lg px-3 py-2 select-none"
