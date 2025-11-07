@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+
 // ==================== Props ====================
 const props = defineProps<{
     isOpen: boolean;
@@ -12,6 +15,8 @@ const emit = defineEmits<{
     "update:editingItem": [item: any];
     submit: [data: any];
 }>();
+
+const { t } = useI18n();
 
 // ==================== Reactive Data ====================
 const formData = reactive({
@@ -95,12 +100,18 @@ const handleSubmit = (e: Event) => {
         <div class="bg-background border-border mx-4 w-full max-w-md rounded-lg border shadow-xl">
             <div class="p-5">
                 <h3 class="text-foreground mb-3 text-base font-semibold">
-                    {{ editingItem ? "编辑日程" : "添加日程" }}
+                    {{
+                        editingItem
+                            ? t("schedule.modal.editSchedule")
+                            : t("schedule.modal.addSchedule")
+                    }}
                 </h3>
 
                 <form @submit="handleSubmit" class="space-y-4">
                     <div>
-                        <label class="text-foreground mb-1 block text-sm font-medium"> 标题 </label>
+                        <label class="text-foreground mb-1 block text-sm font-medium">
+                            {{ t("schedule.modal.title") }}
+                        </label>
                         <input
                             v-model="formData.title"
                             type="text"
@@ -110,7 +121,9 @@ const handleSubmit = (e: Event) => {
                     </div>
 
                     <div>
-                        <label class="text-foreground mb-1 block text-sm font-medium"> 描述 </label>
+                        <label class="text-foreground mb-1 block text-sm font-medium">
+                            {{ t("schedule.modal.description") }}
+                        </label>
                         <textarea
                             v-model="formData.description"
                             class="border-border focus:ring-primary bg-background text-foreground w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none"
@@ -121,7 +134,7 @@ const handleSubmit = (e: Event) => {
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-foreground mb-1 block text-sm font-medium">
-                                日期
+                                {{ t("schedule.modal.date") }}
                             </label>
                             <input
                                 v-model="formData.date"
@@ -133,7 +146,7 @@ const handleSubmit = (e: Event) => {
 
                         <div>
                             <label class="text-foreground mb-1 block text-sm font-medium">
-                                时间
+                                {{ t("schedule.modal.time") }}
                             </label>
                             <input
                                 v-model="formData.time"
@@ -152,7 +165,9 @@ const handleSubmit = (e: Event) => {
                                 type="checkbox"
                                 class="border-border h-4 w-4 rounded"
                             />
-                            <label for="important" class="text-foreground text-sm"> 重要 </label>
+                            <label for="important" class="text-foreground text-sm">
+                                {{ t("schedule.modal.isImportant") }}
+                            </label>
                         </div>
                         <div class="flex items-center gap-2">
                             <input
@@ -161,61 +176,69 @@ const handleSubmit = (e: Event) => {
                                 type="checkbox"
                                 class="border-border h-4 w-4 rounded"
                             />
-                            <label for="urgent" class="text-foreground text-sm"> 紧急 </label>
+                            <label for="urgent" class="text-foreground text-sm">
+                                {{ t("schedule.modal.isUrgent") }}
+                            </label>
                         </div>
                     </div>
 
                     <div v-if="formData.category === 'meeting'">
                         <label class="text-foreground mb-1 block text-sm font-medium">
-                            会议事项/议程
+                            {{ t("schedule.modal.meetingAgenda") }}
                         </label>
                         <input
                             v-model="formData.meetingAgenda"
                             type="text"
                             class="border-border focus:ring-primary bg-background text-foreground w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none"
-                            placeholder="例如：需求评审、方案定稿、问题清单"
                         />
                     </div>
 
                     <div v-if="formData.category === 'meeting'">
                         <label class="text-foreground mb-1 block text-sm font-medium">
-                            与会人
+                            {{ t("schedule.modal.attendees") }}
                         </label>
                         <input
                             v-model="formData.attendees"
                             type="text"
                             class="border-border focus:ring-primary bg-background text-foreground w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none"
-                            placeholder="例如：产品、研发、测试、市场"
                         />
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-foreground mb-1 block text-sm font-medium">
-                                优先级
+                                {{ t("schedule.modal.priority") }}
                             </label>
                             <select
                                 v-model="formData.priority"
                                 class="border-border focus:ring-primary bg-background text-foreground w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none"
                             >
-                                <option value="low">低</option>
-                                <option value="medium">中</option>
-                                <option value="high">高</option>
+                                <option value="low">{{ t("schedule.modal.priorityLow") }}</option>
+                                <option value="medium">
+                                    {{ t("schedule.modal.priorityMedium") }}
+                                </option>
+                                <option value="high">{{ t("schedule.modal.priorityHigh") }}</option>
                             </select>
                         </div>
 
                         <div>
                             <label class="text-foreground mb-1 block text-sm font-medium">
-                                类别
+                                {{ t("schedule.modal.category") }}
                             </label>
                             <select
                                 v-model="formData.category"
                                 class="border-border focus:ring-primary bg-background text-foreground w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none"
                             >
-                                <option value="work">工作</option>
-                                <option value="personal">个人</option>
-                                <option value="meeting">会议</option>
-                                <option value="reminder">提醒</option>
+                                <option value="work">{{ t("schedule.modal.categoryWork") }}</option>
+                                <option value="personal">
+                                    {{ t("schedule.modal.categoryPersonal") }}
+                                </option>
+                                <option value="meeting">
+                                    {{ t("schedule.modal.categoryMeeting") }}
+                                </option>
+                                <option value="reminder">
+                                    {{ t("schedule.modal.categoryReminder") }}
+                                </option>
                             </select>
                         </div>
                     </div>
@@ -226,13 +249,17 @@ const handleSubmit = (e: Event) => {
                             @click="handleClose"
                             class="text-foreground border-border hover:bg-muted rounded-md border px-4 py-2 transition-colors"
                         >
-                            取消
+                            {{ t("schedule.buttons.cancel") }}
                         </button>
                         <button
                             type="submit"
                             class="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 transition-colors"
                         >
-                            {{ editingItem ? "更新" : "添加" }}
+                            {{
+                                editingItem
+                                    ? t("schedule.buttons.edit")
+                                    : t("schedule.buttons.save")
+                            }}
                         </button>
                     </div>
                 </form>

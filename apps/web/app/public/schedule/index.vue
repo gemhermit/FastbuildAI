@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import AddScheduleModal from "./_components/AddScheduleModal.vue";
 import AIAdvice from "./_components/AIAdvice.vue";
@@ -321,12 +322,13 @@ const sendAIMessage = () => {
 };
 
 const generateAIResponse = (input: string): string => {
+    const { t } = useI18n();
     const responses: Record<string, string> = {
-        添加: "好的，我来帮您添加新的日程。请告诉我具体的时间、内容和优先级。",
-        会议: "我看到您有一些会议安排。需要我帮您优化会议时间或准备会议议程吗？",
-        提醒: "我已经为您设置了提醒。我会在合适的时间通知您。",
-        分析: "根据您的日程分析，工作日程较为紧密，建议在上午安排重要会议，下午处理日常事务。",
-        优化: "我建议将类似的任务集中处理，这样可以提高效率。您觉得怎么样？",
+        添加: t("schedule.ai.addScheduleAdvice"),
+        会议: t("schedule.ai.meetingAdvice"),
+        提醒: t("schedule.ai.reminderAdvice"),
+        分析: t("schedule.ai.analysisAdvice"),
+        优化: t("schedule.ai.optimizeAdvice"),
     };
 
     for (const [key, response] of Object.entries(responses)) {
@@ -335,7 +337,7 @@ const generateAIResponse = (input: string): string => {
         }
     }
 
-    return "我理解您的需求。作为您的AI助手，我可以帮您管理日程、设置优先级、分析时间安排。请告诉我更多具体信息，我会为您提供最佳建议。";
+    return t("schedule.ai.defaultResponse");
 };
 
 // ==================== 任务管理 ====================
@@ -518,14 +520,14 @@ export default {
                         class="bg-primary hover:bg-primary/90 flex items-center rounded-lg px-4 py-2 text-white transition-colors"
                     >
                         <Icon name="lucide:bot" class="mr-2 h-5 w-5" />
-                        AI助手
+                        {{ $t("schedule.buttons.aiAssistant") }}
                     </button>
                     <button
                         @click="handleAddScheduleClick"
                         class="flex items-center rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
                     >
                         <Icon name="lucide:plus" class="mr-2 h-5 w-5" />
-                        添加日程
+                        {{ $t("schedule.buttons.addSchedule") }}
                     </button>
                 </div>
 
