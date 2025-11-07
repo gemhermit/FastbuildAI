@@ -19,6 +19,10 @@ interface Props {
     showBillingRule?: boolean;
     // 是否打开本地存储
     openLocalStorage?: boolean;
+    // 允许显示的模型ID列表
+    allowedModelIds?: string[];
+    // 允许显示的模型名称列表
+    allowedModelNames?: string[];
 }
 
 const { t } = useI18n();
@@ -29,6 +33,8 @@ const props = withDefaults(defineProps<Props>(), {
     console: false,
     showBillingRule: false,
     openLocalStorage: false,
+    allowedModelIds: undefined,
+    allowedModelNames: undefined,
 });
 
 const emit = defineEmits<{
@@ -72,9 +78,11 @@ async function loadModels() {
     if (loading.value) return;
     loading.value = true;
     try {
-        providers.value = await apiGetAiProviders({
+        const fetchedProviders = await apiGetAiProviders({
             supportedModelTypes: props.supportedModelTypes,
         });
+
+        providers.value = filterProviders(fetchedProviders);
 
         const findModel = (id?: string) => allModels.value.find((m) => m.id === id);
 
@@ -97,6 +105,30 @@ async function loadModels() {
     } finally {
         loading.value = false;
     }
+}
+
+function filterProviders(list: AiProvider[]): AiProvider[] {
+    const { allowedModelIds, allowedModelNames } = props;
+
+    if (!allowedModelIds?.length && !allowedModelNames?.length) {
+        return list;
+    }
+
+    return list
+        .map((provider) => {
+            const filteredModels = (provider.models ?? []).filter((model) => {
+                if (allowedModelIds?.length && !allowedModelIds.includes(model.id)) return false;
+                if (allowedModelNames?.length && !allowedModelNames.includes(model.name))
+                    return false;
+                return true;
+            });
+
+            return {
+                ...provider,
+                models: filteredModels,
+            } as AiProvider;
+        })
+        .filter((provider) => (provider.models?.length ?? 0) > 0);
 }
 
 /**
