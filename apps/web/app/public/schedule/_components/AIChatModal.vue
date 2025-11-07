@@ -235,7 +235,7 @@ watch(
     >
         <template #default>
             <!-- 消息显示区域 -->
-            <ProScrollArea ref="scrollAreaRef" class="w-full flex-1" type="auto" :shadow="true">
+            <ProScrollArea ref="scrollAreaRef" class="w-full flex-1" type="auto" :shadow="false">
                 <div class="space-y-3 px-4 py-4">
                     <div
                         v-for="message in messages.filter((m) => m.role !== 'system')"
