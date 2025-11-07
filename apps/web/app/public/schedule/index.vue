@@ -28,13 +28,6 @@ interface ScheduleItem {
     deadline?: string;
 }
 
-interface AIMessage {
-    id: string;
-    type: "user" | "ai";
-    content: string;
-    timestamp: string;
-}
-
 // ==================== 页面元数据 ====================
 
 definePageMeta({
@@ -88,8 +81,6 @@ const selectedDate = ref(new Date());
 const scheduleItems = ref<ScheduleItem[]>([]);
 const showAddModal = ref(false);
 const showAIChat = ref(false);
-const aiMessages = ref<AIMessage[]>([]);
-const aiInput = ref("");
 const editingItem = ref<ScheduleItem | null>(null);
 const dailyGoals = ref<Record<string, string>>({});
 const loadingTasks = ref(false);
@@ -172,16 +163,6 @@ const mockScheduleData: ScheduleItem[] = [
     },
 ];
 
-const mockAIMessages: AIMessage[] = [
-    {
-        id: "1",
-        type: "ai",
-        content:
-            "您好！我是您的AI日程助手。我可以帮您管理日程、设置提醒、分析时间安排。有什么需要帮助的吗？",
-        timestamp: new Date().toISOString(),
-    },
-];
-
 // ==================== 数据加载 ====================
 
 const loadTasksFromApi = async () => {
@@ -255,7 +236,6 @@ const loadTasksFromApi = async () => {
             return Array.from(map.values());
         })(scheduleItems.value);
     } finally {
-        aiMessages.value = mockAIMessages;
         loadingTasks.value = false;
     }
 };
@@ -295,49 +275,10 @@ const getScheduleForDate = (date: Date) => {
 
 // ==================== AI 助手 ====================
 
-const sendAIMessage = () => {
-    if (!aiInput.value.trim()) return;
-
-    const userMessage: AIMessage = {
-        id: Date.now().toString(),
-        type: "user",
-        content: aiInput.value,
-        timestamp: new Date().toISOString(),
-    };
-
-    aiMessages.value = [...aiMessages.value, userMessage];
-
-    setTimeout(() => {
-        const aiResponse = generateAIResponse(aiInput.value);
-        const aiMessage: AIMessage = {
-            id: (Date.now() + 1).toString(),
-            type: "ai",
-            content: aiResponse,
-            timestamp: new Date().toISOString(),
-        };
-        aiMessages.value = [...aiMessages.value, aiMessage];
-    }, 1000);
-
-    aiInput.value = "";
-};
-
-const generateAIResponse = (input: string): string => {
-    const { t } = useI18n();
-    const responses: Record<string, string> = {
-        添加: t("schedule.ai.addScheduleAdvice"),
-        会议: t("schedule.ai.meetingAdvice"),
-        提醒: t("schedule.ai.reminderAdvice"),
-        分析: t("schedule.ai.analysisAdvice"),
-        优化: t("schedule.ai.optimizeAdvice"),
-    };
-
-    for (const [key, response] of Object.entries(responses)) {
-        if (input.includes(key)) {
-            return response;
-        }
-    }
-
-    return t("schedule.ai.defaultResponse");
+// 将日程项传给 AI 助手
+const getScheduleContextForAI = () => {
+    const dateStr = formatDateLocal(selectedDate.value);
+    return scheduleItems.value.filter((item) => item.date === dateStr);
 };
 
 // ==================== 任务管理 ====================
@@ -499,12 +440,12 @@ export default {
         class="dark:to-primary-950 min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-neutral-900 dark:via-neutral-800"
     >
         <!-- Header -->
-        <div class="container mx-auto w-full px-4 pt-16 pb-8">
+        <div class="container mx-auto w-full px-4 pt-4 pb-4">
             <div class="text-center">
                 <h1 class="text-foreground mb-4 text-4xl font-bold">
                     {{ $t("schedule.title") }}
                 </h1>
-                <p class="text-md text-accent-foreground mb-8">
+                <p class="text-md text-accent-foreground mb-4">
                     {{ $t("schedule.subtitle") }}
                 </p>
             </div>
@@ -602,11 +543,8 @@ export default {
         <!-- AI Chat Modal -->
         <AIChatModal
             :is-open="showAIChat"
-            :ai-messages="aiMessages"
-            :ai-input="aiInput"
+            :schedule-items="getScheduleContextForAI()"
             @update:is-open="showAIChat = $event"
-            @update:ai-input="aiInput = $event"
-            @send-message="sendAIMessage"
         />
 
         <!-- Add Schedule Modal -->
