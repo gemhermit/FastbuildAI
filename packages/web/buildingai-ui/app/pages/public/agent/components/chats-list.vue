@@ -407,7 +407,7 @@ defineShortcuts({
                     </div>
 
                     <!-- 品牌信息（底部） -->
-                    <div class="border-border/50 border-t pt-2">
+                    <!-- <div class="border-border/50 border-t pt-2">
                         <div
                             class="text-muted-foreground flex items-center justify-center gap-1 text-xs"
                         >
@@ -420,7 +420,7 @@ defineShortcuts({
                                 BuildingAI
                             </a>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </transition>
 

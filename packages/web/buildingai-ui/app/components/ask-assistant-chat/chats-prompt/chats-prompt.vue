@@ -26,6 +26,7 @@ const props = withDefaults(
         rows?: number;
         needAuth?: boolean;
         attachmentSizeLimit?: number;
+        showFileUpload?: boolean;
     }>(),
     {
         modelValue: "",
@@ -35,6 +36,7 @@ const props = withDefaults(
         rows: 1,
         needAuth: false,
         attachmentSizeLimit: 10,
+        showFileUpload: true,
     },
 );
 
@@ -280,6 +282,7 @@ onMounted(() =>
                         />
                     </UTooltip>
                     <PromptFileUpload
+                        v-if="showFileUpload"
                         :disabled="isUploading"
                         :maxSize="attachmentSizeLimit"
                         @file-select="handleFileSelect"

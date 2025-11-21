@@ -283,7 +283,7 @@ definePageMeta({
                             "
                             >|</span
                         >
-                        <span class="space-x-1">
+                        <!-- <span class="space-x-1">
                             <span>Powered by</span>
                             <a
                                 class="text-primary font-bold"
@@ -292,7 +292,7 @@ definePageMeta({
                             >
                                 BuildingAI
                             </a>
-                        </span>
+                        </span> -->
                     </div>
                 </div>
             </div>
