@@ -3,6 +3,7 @@ import { computed } from "vue";
 
 import type { ScheduleItem } from "../types";
 import { formatDateLocal } from "../utils";
+import ListView from "./list-view.vue";
 
 type CalendarMode = "day" | "week" | "month";
 
@@ -12,6 +13,7 @@ const props = defineProps<{
     scheduleItems: ScheduleItem[];
     mode: CalendarMode;
     loading?: boolean;
+    deletingId?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -20,6 +22,11 @@ const emit = defineEmits<{
     (e: "change-mode", value: CalendarMode): void;
     (e: "create", value: Date): void;
     (e: "edit", value: ScheduleItem): void;
+    (e: "open-ai"): void;
+    (e: "toggle-complete", id: string): void;
+    (e: "toggle-important", id: string): void;
+    (e: "toggle-urgent", id: string): void;
+    (e: "delete", id: string): void;
 }>();
 
 const weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -43,8 +50,10 @@ const headerTitle = computed(() => {
         });
     }
     if (props.mode === "week") {
-        const start = weekDays.value[0];
-        const end = weekDays.value[weekDays.value.length - 1];
+        const days = weekDays.value;
+        const start = days[0];
+        const end = days[days.length - 1];
+        if (!start || !end) return "";
         return `${start.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })} - ${end.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}`;
     }
     return `${props.currentDate.getFullYear()} 年 ${props.currentDate.getMonth() + 1} 月`;
@@ -118,6 +127,18 @@ const goToday = () => {
     setSelectedDate(new Date());
 };
 
+const goPrevWeek = () => {
+    const target = new Date(props.selectedDate);
+    target.setDate(target.getDate() - 7);
+    setSelectedDate(target);
+};
+
+const goNextWeek = () => {
+    const target = new Date(props.selectedDate);
+    target.setDate(target.getDate() + 7);
+    setSelectedDate(target);
+};
+
 const isToday = (date: Date) => date.toDateString() === new Date().toDateString();
 </script>
 
@@ -167,12 +188,12 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
             </div>
         </div>
 
-        <div
+        <!-- <div
             v-if="loading"
             class="mb-3 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700"
         >
             正在同步日程...
-        </div>
+        </div> -->
 
         <div v-if="mode === 'month'" class="space-y-3">
             <div class="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-gray-500">
@@ -187,9 +208,13 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
                     @click="setSelectedDate(date)"
                     class="group relative h-24 cursor-pointer rounded-xl border border-transparent bg-gray-50 p-2 text-left transition hover:border-blue-100 hover:bg-white"
                     :class="[
-                        date.getMonth() === currentDate.getMonth() ? 'text-gray-900' : 'text-gray-400',
+                        date.getMonth() === currentDate.getMonth()
+                            ? 'text-gray-900'
+                            : 'text-gray-400',
                         isToday(date) ? 'border-blue-200 bg-blue-50' : '',
-                        date.toDateString() === selectedDate.toDateString() ? 'ring-2 ring-blue-500' : '',
+                        date.toDateString() === selectedDate.toDateString()
+                            ? 'ring-2 ring-blue-500'
+                            : '',
                     ]"
                 >
                     <div class="flex items-center justify-between">
@@ -219,7 +244,7 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
                         v-if="date.toDateString() === selectedDate.toDateString()"
                         @click.stop="emit('create', date)"
                         title="添加日程"
-                        class="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 shadow-lg transition group-hover:opacity-100"
+                        class="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 shadow-lg transition group-hover:opacity-100"
                     >
                         <UIcon name="i-lucide-plus" class="h-4 w-4" />
                     </button>
@@ -228,26 +253,50 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
         </div>
 
         <div v-else-if="mode === 'week'" class="space-y-3">
+            <div class="relative rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <div class="grid grid-cols-7 gap-3">
+                    <button
+                        v-for="(date, idx) in weekDays"
+                        :key="idx"
+                        @click="setSelectedDate(date)"
+                        class="flex flex-col items-center rounded-lg px-3 py-2 text-xs transition"
+                        :class="[
+                            date.toDateString() === selectedDate.toDateString()
+                                ? 'bg-blue-600 text-white shadow'
+                                : 'text-gray-700 hover:bg-gray-100',
+                        ]"
+                    >
+                        <span class="text-[13px] font-semibold">{{ weekdays[idx] }}</span>
+                        <span class="text-lg leading-tight font-bold">{{ date.getDate() }}</span>
+                    </button>
+                </div>
+                <button
+                    @click="goPrevWeek"
+                    class="absolute top-1/2 -left-6 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 text-gray-600 shadow-sm transition hover:bg-gray-50"
+                >
+                    <UIcon name="i-lucide-chevron-left" class="h-5 w-5" />
+                </button>
+                <button
+                    @click="goNextWeek"
+                    class="absolute top-1/2 -right-6 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 text-gray-600 shadow-sm transition hover:bg-gray-50"
+                >
+                    <UIcon name="i-lucide-chevron-right" class="h-5 w-5" />
+                </button>
+            </div>
             <div class="grid grid-cols-7 gap-3">
                 <div
                     v-for="(date, idx) in weekDays"
                     :key="idx"
-                    class="flex flex-col rounded-xl border border-gray-100 bg-gray-50 p-3"
+                    class="flex min-h-[360px] flex-col rounded-xl border border-gray-100 bg-white/70 p-3 shadow-sm"
                 >
-                    <div class="mb-2 flex items-center justify-between">
-                        <div>
-                            <div class="text-xs text-gray-500">{{ weekdays[idx] }}</div>
-                            <div class="text-sm font-semibold text-gray-900">
-                                {{ date.getMonth() + 1 }}/{{ date.getDate() }}
-                            </div>
-                        </div>
+                    <!-- <div class="mb-2 flex justify-end">
                         <button
                             @click="emit('create', date)"
-                            class="rounded-full bg-white p-1 text-gray-500 shadow hover:text-blue-600"
+                            class="rounded-full bg-blue-50 p-1 text-blue-600 transition hover:bg-blue-100"
                         >
                             <UIcon name="i-lucide-plus" class="h-4 w-4" />
                         </button>
-                    </div>
+                    </div> -->
                     <div class="flex-1 space-y-2">
                         <div
                             v-if="getScheduleForDate(date).length === 0"
@@ -259,21 +308,18 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
                             v-else
                             v-for="item in sortByTime(getScheduleForDate(date))"
                             :key="item.id"
-                            class="rounded-lg border border-gray-200 bg-white p-2 text-xs shadow-sm"
+                            class="rounded-lg bg-amber-200/80 px-2 py-1 text-xs text-gray-800 shadow"
                         >
-                            <div class="flex items-center justify-between">
-                                <div class="font-semibold text-gray-800">{{ item.title }}</div>
+                            <div class="flex items-center justify-between font-semibold">
+                                <span class="truncate">{{ item.title }}</span>
                                 <button
-                                    class="text-blue-600 hover:text-blue-800"
+                                    class="text-blue-700 hover:text-blue-900"
                                     @click="emit('edit', item)"
                                 >
                                     <UIcon name="i-lucide-edit" class="h-4 w-4" />
                                 </button>
                             </div>
-                            <div class="mt-1 text-[11px] text-gray-500">
-                                {{ item.time }}
-                            </div>
-                            <div class="text-[11px] text-gray-400">{{ item.description }}</div>
+                            <div class="mt-1 text-[11px] text-gray-700">{{ item.time }}</div>
                         </div>
                     </div>
                 </div>
@@ -281,72 +327,54 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
         </div>
 
         <div v-else class="space-y-4">
-            <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3">
-                <div class="text-sm font-semibold text-gray-900">
-                    {{ selectedDate.toLocaleDateString("zh-CN", { month: "long", day: "numeric" }) }}
-                </div>
-                <button
-                    @click="emit('create', selectedDate)"
-                    class="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow hover:bg-blue-700"
-                >
-                    添加日程
-                </button>
-            </div>
-            <div class="space-y-3">
-                <div
-                    v-if="daySchedules.length === 0"
-                    class="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400"
-                >
-                    还没有日程，点击右上角添加吧
-                </div>
-                <div
-                    v-else
-                    v-for="item in daySchedules"
-                    :key="item.id"
-                    class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
-                >
-                    <div class="flex flex-col items-center text-xs text-gray-500">
-                        <span class="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
-                            {{ item.time }}
-                        </span>
-                        <span
-                            v-if="item.endTime"
-                            class="mt-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+            <div
+                class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3"
+            >
+                <div class="flex w-full items-center gap-3">
+                    <button
+                        @click="goPrevWeek"
+                        class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:bg-gray-50"
+                    >
+                        <UIcon name="i-lucide-chevron-left" class="h-5 w-5" />
+                    </button>
+                    <div class="grid flex-1 grid-cols-7 gap-3">
+                        <button
+                            v-for="(date, idx) in weekDays"
+                            :key="idx"
+                            @click="setSelectedDate(date)"
+                            class="flex flex-col items-center rounded-lg px-3 py-2 text-xs transition"
+                            :class="[
+                                date.toDateString() === selectedDate.toDateString()
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-gray-700 hover:bg-gray-100',
+                            ]"
                         >
-                            {{ item.endTime }}
-                        </span>
+                            <span class="text-[13px] font-semibold">{{ weekdays[idx] }}</span>
+                            <span class="text-lg leading-tight font-bold">{{
+                                date.getDate()
+                            }}</span>
+                        </button>
                     </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center justify-between">
-                            <div class="text-sm font-semibold text-gray-900">{{ item.title }}</div>
-                            <button
-                                class="rounded-full p-1 text-blue-600 hover:bg-blue-50"
-                                @click="emit('edit', item)"
-                            >
-                                <UIcon name="i-lucide-edit" class="h-4 w-4" />
-                            </button>
-                        </div>
-                        <div class="text-xs text-gray-500">{{ item.description }}</div>
-                        <div class="mt-2 flex flex-wrap gap-2 text-[11px] text-gray-500">
-                            <span
-                                v-if="item.isImportant"
-                                class="rounded-full bg-red-50 px-2 py-0.5 text-red-600"
-                            >
-                                重要
-                            </span>
-                            <span
-                                v-if="item.isUrgent"
-                                class="rounded-full bg-orange-50 px-2 py-0.5 text-orange-600"
-                            >
-                                紧急
-                            </span>
-                            <span class="rounded-full bg-gray-100 px-2 py-0.5">
-                                {{ item.category }}
-                            </span>
-                        </div>
-                    </div>
+                    <button
+                        @click="goNextWeek"
+                        class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:bg-gray-50"
+                    >
+                        <UIcon name="i-lucide-chevron-right" class="h-5 w-5" />
+                    </button>
                 </div>
             </div>
+            <ListView
+                :selected-date="selectedDate"
+                :schedule-items="daySchedules"
+                :deleting-id="props.deletingId ?? null"
+                @create="emit('create', selectedDate)"
+                @openAi="emit('open-ai')"
+                @toggleComplete="emit('toggle-complete', $event)"
+                @toggleImportant="emit('toggle-important', $event)"
+                @toggleUrgent="emit('toggle-urgent', $event)"
+                @edit="emit('edit', $event)"
+                @delete="emit('delete', $event)"
+            />
         </div>
     </div>
 </template>

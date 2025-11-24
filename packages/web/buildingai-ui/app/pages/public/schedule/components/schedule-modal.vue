@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-
 import type { ScheduleItem } from "../types";
 import { formatDateLocal } from "../utils";
 
@@ -15,6 +13,15 @@ const emit = defineEmits<{
     (e: "close"): void;
     (e: "save", item: Omit<ScheduleItem, "id">): void;
 }>();
+
+const normalizeTime = (value?: string) => {
+    if (!value) return "09:00";
+    const match = value.match(/(\d{1,2}):(\d{2})/);
+    if (!match || !match[1] || !match[2]) return "09:00";
+    const hour = match[1].padStart(2, "0");
+    const minute = match[2].padStart(2, "0");
+    return `${hour}:${minute}`;
+};
 
 const formData = ref({
     title: "",
@@ -52,8 +59,8 @@ watch(
             formData.value = {
                 title,
                 description,
-                date,
-                time,
+                date: date || formatDateLocal(props.selectedDate),
+                time: normalizeTime(time),
                 priority,
                 category,
                 completed,
@@ -82,7 +89,10 @@ watch(
 );
 
 const handleSubmit = () => {
-    emit("save", formData.value);
+    emit("save", {
+        ...formData.value,
+        time: normalizeTime(formData.value.time),
+    });
 };
 </script>
 
@@ -132,18 +142,13 @@ const handleSubmit = () => {
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-600">时间</label>
-                            <div class="relative">
+                            <div class="flex items-center gap-2">
                                 <input
                                     v-model="formData.time"
                                     type="time"
-                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                                     required
                                 />
-                                <span
-                                    class="material-icons-outlined pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400"
-                                >
-                                    schedule
-                                </span>
                             </div>
                         </div>
                     </div>

@@ -47,15 +47,6 @@ const viewTabs = [
     { key: "quadrant", label: "四象限视图" },
 ] as const;
 
-const selectedDateLabel = computed(() =>
-    selectedDate.value.toLocaleDateString("zh-CN", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        weekday: "long",
-    }),
-);
-
 onMounted(async () => {
     try {
         const defaultModel = await apiGetDefaultAiModel();
@@ -469,9 +460,7 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
         <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p class="text-sm text-gray-500">公共日程</p>
-                    <h1 class="text-2xl font-semibold text-gray-900">智能时间管理</h1>
-                    <p class="mt-1 text-xs text-gray-500">当前选择：{{ selectedDateLabel }}</p>
+                    <h1 class="text-2xl font-semibold text-gray-900">日程管理</h1>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button
@@ -489,7 +478,9 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                     >
                         新建日程
                     </button>
-                    <div class="flex rounded-full bg-white p-1 text-sm shadow-sm ring-1 ring-gray-200">
+                    <div
+                        class="flex rounded-full bg-white p-1 text-sm shadow-sm ring-1 ring-gray-200"
+                    >
                         <button
                             v-for="tab in viewTabs"
                             :key="tab.key"
@@ -538,6 +529,7 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                 :schedule-items="scheduleItems"
                 :mode="calendarViewMode"
                 :loading="loadingTasks"
+                :deleting-id="deletingScheduleId"
                 @update:selectedDate="setSelectedDate"
                 @update:currentDate="handleCalendarCursorChange"
                 @change-mode="calendarViewMode = $event"
@@ -547,6 +539,11 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                     showAddModal = true;
                 "
                 @edit="handleEdit"
+                @open-ai="showAIChat = true"
+                @toggle-complete="toggleComplete"
+                @toggle-important="toggleImportant"
+                @toggle-urgent="toggleUrgent"
+                @delete="handleDeleteSchedule"
             />
 
             <QuadrantView
@@ -561,6 +558,11 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                 @toggleUrgent="toggleUrgent"
                 @edit="handleEdit"
                 @delete="handleDeleteSchedule"
+                @create="
+                    editingItem = null;
+                    showAddModal = true;
+                "
+                @openAi="showAIChat = true"
             />
         </div>
 
