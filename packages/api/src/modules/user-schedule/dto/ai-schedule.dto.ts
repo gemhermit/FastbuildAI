@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
     IsBoolean,
     IsDateString,
@@ -8,7 +9,6 @@ import {
     IsUUID,
     ValidateNested,
 } from "class-validator";
-import { Type } from "class-transformer";
 
 import type { ScheduleIntent } from "../interfaces/ai-schedule.interface";
 

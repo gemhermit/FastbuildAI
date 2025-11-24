@@ -1,8 +1,8 @@
-import { Module } from "@nestjs/common";
+import { SecretService } from "@buildingai/core/modules/secret/services/secret.service";
 import { TypeOrmModule } from "@buildingai/db/@nestjs/typeorm";
 import { AiModel } from "@buildingai/db/entities/ai-model.entity";
 import { UserSchedule } from "@buildingai/db/entities/user-schedule.entity";
-import { SecretService } from "@buildingai/core/modules/secret/services/secret.service";
+import { Module } from "@nestjs/common";
 
 import { UserScheduleController } from "./controllers/user-schedule.controller";
 import { AiScheduleService } from "./services/ai-schedule.service";

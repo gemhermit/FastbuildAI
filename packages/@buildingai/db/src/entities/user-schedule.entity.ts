@@ -1,11 +1,5 @@
 import { AppEntity } from "../decorators/app-entity.decorator";
-import {
-    Column,
-    Index,
-    JoinColumn,
-    ManyToOne,
-    type Relation,
-} from "../typeorm";
+import { Column, Index, JoinColumn, ManyToOne, type Relation } from "../typeorm";
 import { SoftDeleteBaseEntity } from "./base";
 import { User } from "./user.entity";
 

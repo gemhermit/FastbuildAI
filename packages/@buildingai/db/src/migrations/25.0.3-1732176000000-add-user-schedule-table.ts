@@ -38,9 +38,7 @@ export async function up(dataSource: DataSource): Promise<void> {
         );
     `);
 
-    await dataSource.query(
-        `COMMENT ON TABLE "${TABLE_NAME}" IS '用户个人日程';`,
-    );
+    await dataSource.query(`COMMENT ON TABLE "${TABLE_NAME}" IS '用户个人日程';`);
     await dataSource.query(
         `COMMENT ON COLUMN "${TABLE_NAME}"."metadata" IS 'AI 解析的原始字段或额外属性';`,
     );

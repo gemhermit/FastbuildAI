@@ -91,7 +91,7 @@ const handleSubmit = () => {
         <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
             <div class="mb-4 flex items-center justify-between">
                 <div>
-                    <p class="text-xs uppercase tracking-widest text-gray-400">
+                    <p class="text-xs tracking-widest text-gray-400 uppercase">
                         {{ editingItem ? "编辑日程" : "新建日程" }}
                     </p>
                     <h3 class="text-xl font-semibold text-gray-900">
@@ -198,7 +198,9 @@ const handleSubmit = () => {
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-600">优先级</label>
+                                <label class="block text-sm font-medium text-gray-600"
+                                    >优先级</label
+                                >
                                 <select
                                     v-model="formData.priority"
                                     class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
@@ -211,19 +213,33 @@ const handleSubmit = () => {
                         </div>
 
                         <div class="grid gap-3 md:grid-cols-2">
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                                <input type="checkbox" class="rounded" v-model="formData.isImportant" />
+                            <label
+                                class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="rounded"
+                                    v-model="formData.isImportant"
+                                />
                                 <span>标记为重要</span>
                             </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                                <input type="checkbox" class="rounded" v-model="formData.isUrgent" />
+                            <label
+                                class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="rounded"
+                                    v-model="formData.isUrgent"
+                                />
                                 <span>标记为紧急</span>
                             </label>
                         </div>
 
                         <div v-if="formData.category === 'meeting'" class="space-y-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-600">会议议程</label>
+                                <label class="block text-sm font-medium text-gray-600"
+                                    >会议议程</label
+                                >
                                 <input
                                     type="text"
                                     v-model="formData.meetingAgenda"
@@ -249,13 +265,7 @@ const handleSubmit = () => {
                         class="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
                         :disabled="props.saving"
                     >
-                        {{
-                            props.saving
-                                ? "保存中..."
-                                : editingItem
-                                  ? "更新日程"
-                                  : "创建日程"
-                        }}
+                        {{ props.saving ? "保存中..." : editingItem ? "更新日程" : "创建日程" }}
                     </button>
                 </div>
             </form>

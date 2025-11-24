@@ -1,8 +1,7 @@
+import { HttpErrorFactory } from "@buildingai/errors";
+import { WebController } from "@common/decorators/controller.decorator";
 import { Body, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import type { Request } from "express";
-
-import { WebController } from "@common/decorators/controller.decorator";
-import { HttpErrorFactory } from "@buildingai/errors";
 
 import { ExecuteScheduleDto, ParseScheduleDto } from "../dto/ai-schedule.dto";
 import { CreateUserScheduleDto } from "../dto/create-user-schedule.dto";

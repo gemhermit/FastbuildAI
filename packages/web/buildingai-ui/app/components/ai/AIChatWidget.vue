@@ -8,7 +8,6 @@ import {
     type ScheduleProposal,
     type UserScheduleEvent,
 } from "@buildingai/service/webapi/user-schedule";
-
 import { computed, nextTick, ref, watch } from "vue";
 
 import ScheduleCard from "./ScheduleCard.vue";

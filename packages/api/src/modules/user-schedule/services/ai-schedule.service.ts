@@ -1,12 +1,12 @@
 import { getProvider, TextGenerator } from "@buildingai/ai-sdk";
 import { AI_DEFAULT_MODEL } from "@buildingai/constants";
 import { SecretService } from "@buildingai/core/modules/secret/services/secret.service";
+import { InjectRepository } from "@buildingai/db/@nestjs/typeorm";
 import { AiModel } from "@buildingai/db/entities/ai-model.entity";
 import { UserSchedule } from "@buildingai/db/entities/user-schedule.entity";
-import { InjectRepository } from "@buildingai/db/@nestjs/typeorm";
 import { Repository } from "@buildingai/db/typeorm";
-import { HttpErrorFactory } from "@buildingai/errors";
 import { DictService } from "@buildingai/dict";
+import { HttpErrorFactory } from "@buildingai/errors";
 import { getProviderSecret } from "@buildingai/utils";
 import { Injectable, Logger } from "@nestjs/common";
 
@@ -81,10 +81,7 @@ export class AiScheduleService {
     /**
      * 执行解析后的意图
      */
-    async executeIntent(
-        userId: string,
-        dto: ExecuteScheduleDto,
-    ): Promise<ScheduleExecutionResult> {
+    async executeIntent(userId: string, dto: ExecuteScheduleDto): Promise<ScheduleExecutionResult> {
         switch (dto.intent) {
             case "create":
                 return this.executeCreate(userId, dto);
@@ -244,9 +241,7 @@ export class AiScheduleService {
 
     private async createGenerator(model: AiModel): Promise<TextGenerator> {
         if (!model.provider?.bindSecretId) {
-            this.logger.error(
-                `模型 ${model.id} 缺少绑定的密钥 ID，无法创建生成器`,
-            );
+            this.logger.error(`模型 ${model.id} 缺少绑定的密钥 ID，无法创建生成器`);
             throw HttpErrorFactory.internal("AI 模型密钥未配置，请联系管理员");
         }
 
@@ -305,9 +300,7 @@ export class AiScheduleService {
         ].join("\n");
     }
 
-    private parseAssistantContent(
-        raw: string,
-    ): {
+    private parseAssistantContent(raw: string): {
         reply?: string;
         intent?: ScheduleIntent;
         proposal?: ScheduleProposalPayload;
@@ -316,7 +309,10 @@ export class AiScheduleService {
         follow_up_question?: string;
         target_event_id?: string;
     } {
-        const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const cleaned = raw
+            .replace(/```json/gi, "")
+            .replace(/```/g, "")
+            .trim();
         try {
             return JSON.parse(cleaned);
         } catch {

@@ -1,11 +1,6 @@
 import { InjectRepository } from "@buildingai/db/@nestjs/typeorm";
 import { UserSchedule } from "@buildingai/db/entities/user-schedule.entity";
-import {
-    Between,
-    LessThanOrEqual,
-    MoreThanOrEqual,
-    Repository,
-} from "@buildingai/db/typeorm";
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from "@buildingai/db/typeorm";
 import { HttpErrorFactory } from "@buildingai/errors";
 import { Injectable, Logger } from "@nestjs/common";
 
@@ -146,7 +141,10 @@ export class UserScheduleService {
         });
     }
 
-    private normalizeTimeRange(startInput: string, endInput?: string): {
+    private normalizeTimeRange(
+        startInput: string,
+        endInput?: string,
+    ): {
         startTime: Date;
         endTime: Date;
     } {

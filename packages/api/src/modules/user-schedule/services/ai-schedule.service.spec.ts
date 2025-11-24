@@ -1,10 +1,10 @@
+import { SecretService } from "@buildingai/core/modules/secret/services/secret.service";
 import { AiModel } from "@buildingai/db/entities/ai-model.entity";
 import { Repository } from "@buildingai/db/typeorm";
-import { SecretService } from "@buildingai/core/modules/secret/services/secret.service";
 
 import { ExecuteScheduleDto, ParseScheduleDto } from "../dto/ai-schedule.dto";
-import { UserScheduleService } from "./user-schedule.service";
 import { AiScheduleService } from "./ai-schedule.service";
+import { UserScheduleService } from "./user-schedule.service";
 
 jest.mock("callsites", () => {
     return () => [];

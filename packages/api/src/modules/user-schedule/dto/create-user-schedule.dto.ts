@@ -2,14 +2,7 @@ import type {
     ScheduleCategory,
     SchedulePriority,
 } from "@buildingai/db/entities/user-schedule.entity";
-import {
-    IsBoolean,
-    IsDateString,
-    IsIn,
-    IsOptional,
-    IsString,
-    MaxLength,
-} from "class-validator";
+import { IsBoolean, IsDateString, IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class CreateUserScheduleDto {
     @IsString()
