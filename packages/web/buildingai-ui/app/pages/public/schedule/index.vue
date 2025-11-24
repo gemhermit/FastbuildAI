@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { apiChatStream, apiGetDefaultAiModel } from "@buildingai/service/webapi/ai-conversation";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { apiGetDefaultAiModel } from "@buildingai/service/webapi/ai-conversation";
+import {
+    apiCreateUserSchedule,
+    apiDeleteUserSchedule,
+    apiListUserSchedules,
+    apiUpdateUserSchedule,
+    type ScheduleProposal,
+    type UserScheduleEvent,
+} from "@buildingai/service/webapi/user-schedule";
+import { computed, onMounted, ref, watch } from "vue";
 
 import QuadrantCard from "./components/quadrant-card.vue";
 import ScheduleModal from "./components/schedule-modal.vue";
@@ -12,25 +20,6 @@ import {
     getLocalDate,
     parseLocalDate,
 } from "./utils";
-
-interface ApiTask {
-    id?: string | number;
-    title?: string;
-    description?: string;
-    date?: string;
-    deadline?: string;
-    time?: string;
-    priority?: string;
-    category?: string;
-    completed?: boolean;
-    isImportant?: boolean;
-    important?: boolean;
-    isUrgent?: boolean;
-    urgent?: boolean;
-    meetingAgenda?: string;
-    attendees?: string | string[];
-    owner_id?: string;
-}
 
 definePageMeta({
     layout: "default",
@@ -49,11 +38,14 @@ const editingItem = ref<ScheduleItem | null>(null);
 const dailyGoals = ref<Record<string, string>>({});
 const loadingTasks = ref(false);
 const fetchError = ref<string | null>(null);
+const isSavingSchedule = ref(false);
+const deletingScheduleId = ref<string | null>(null);
 
 const todoSortBy = ref<"time" | "importance">("time");
 const todoFilterCategory = ref<"all" | "work" | "personal" | "meeting" | "reminder">("all");
 const showCompletedInList = ref(false);
 const defaultModelId = ref<string>("");
+const browserTimezone = ref(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
 
 const isMounted = ref(false);
 onMounted(async () => {
@@ -133,111 +125,113 @@ const mockScheduleData: ScheduleItem[] = [
     },
 ];
 
-const {
-    messages: aiMessages,
-    input: aiInput,
-    handleSubmit: sendAIMessage,
-    status,
-} = useChat({
-    api: apiChatStream,
-    initialMessages: [
-        {
-            id: "welcome",
-            role: "assistant",
-            content:
-                "您好！我是您的AI日程助手。我可以帮您管理日程、设置提醒、分析时间安排。有什么需要帮助的吗？",
-        },
-    ],
-    body: {
-        get modelId() {
-            return defaultModelId.value;
-        },
-    },
-    onError: (err) => {
-        console.error("Chat error:", err);
-    },
-});
+const DEFAULT_EVENT_DURATION = 60 * 60 * 1000;
+const DRAFT_ID_PREFIX = "__draft__";
 
-const messagesContainer = ref<HTMLElement | null>(null);
-
-const scrollToBottom = async () => {
-    await nextTick();
-    if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+const combineLocalDateTime = (dateStr: string, timeStr: string) => {
+    const normalizedTime = timeStr && timeStr.length >= 4 ? timeStr : "00:00";
+    const date = new Date(`${dateStr}T${normalizedTime}`);
+    if (Number.isNaN(date.getTime())) {
+        throw new Error("Invalid date or time");
     }
+    return date;
 };
 
-watch(
-    () => aiMessages.value,
-    () => {
-        scrollToBottom();
-    },
-    { deep: true, flush: "post" },
-);
+const buildScheduleRequest = (
+    item: Omit<ScheduleItem, "id">,
+    existing?: ScheduleItem | null,
+) => {
+    const start = combineLocalDateTime(item.date, item.time);
 
-const isLoading = computed(() => status.value === "loading");
+    let end: Date | undefined;
+    if (item.endTime) {
+        const parsedEnd = new Date(`${item.date}T${item.endTime}`);
+        if (!Number.isNaN(parsedEnd.getTime())) {
+            end = parsedEnd;
+        }
+    }
+    if (!end && existing?.endDateTime) {
+        const parsedEnd = new Date(existing.endDateTime);
+        if (!Number.isNaN(parsedEnd.getTime())) {
+            end = parsedEnd;
+        }
+    }
+    if (!end) {
+        end = new Date(start.getTime() + DEFAULT_EVENT_DURATION);
+    }
 
-const loadTasksFromApi = async () => {
+    const combinedDescription = [item.description, item.meetingAgenda]
+        .map((text) => text?.trim())
+        .filter(Boolean)
+        .join("\n");
+
+    const attendees = item.attendees?.trim();
+
+    return {
+        title: item.title,
+        description: combinedDescription || undefined,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        attendees: attendees || undefined,
+        category: item.category,
+        priority: item.priority,
+        isImportant: item.isImportant,
+        isUrgent: item.isUrgent,
+        timezone: existing?.timezone || browserTimezone.value,
+    };
+};
+
+const convertProposalToScheduleItem = (proposal: ScheduleProposal): ScheduleItem => {
+    const data = proposal.data;
+    const startDate = data.startTime ? new Date(data.startTime) : new Date();
+    const endDate = data.endTime ? new Date(data.endTime) : undefined;
+    const date = formatDateLocal(startDate);
+    const draftId =
+        globalThis.crypto?.randomUUID?.() !== undefined
+            ? globalThis.crypto.randomUUID()
+            : `${Date.now()}`;
+    return {
+        id: `${DRAFT_ID_PREFIX}${draftId}`,
+        title: data.title || proposal.summary,
+        description: data.description || proposal.summary,
+        date,
+        time: formatTimeFromIso(data.startTime) || "09:00",
+        endTime: formatTimeFromIso(data.endTime),
+        startDateTime: data.startTime,
+        endDateTime: data.endTime,
+        priority: data.priority || "medium",
+        category: data.category || "work",
+        completed: false,
+        isImportant: data.isImportant,
+        isUrgent: data.isUrgent,
+        meetingAgenda: data.description,
+        attendees: data.attendees,
+        timezone: data.timezone || browserTimezone.value,
+    };
+};
+
+const loadTasksFromApi = async (range: { start: Date; end: Date }) => {
     loadingTasks.value = true;
     fetchError.value = null;
     try {
-        const dateKey = formatDateLocal(selectedDate.value);
-        // Using fetch directly as in the example, but in Nuxt useFetch is preferred.
-        // However, since we expect it to fail or return mock structure, I'll keep it simple or just use mock directly if API doesn't exist.
-        // The user provided code uses fetch.
-        const res = await fetch(`/api/tasks?date=${dateKey}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        let tasks: ScheduleItem[] = [];
-
-        if (data && data.quadrants) {
-            const { quadrants } = data;
-            tasks = [
-                ...(quadrants.IU || []),
-                ...(quadrants.IN || []),
-                ...(quadrants.NU || []),
-                ...(quadrants.NN || []),
-            ].map((t: ApiTask) => ({
-                id: String(t.id ?? Date.now()),
-                title: t.title ?? "",
-                description: t.description ?? "",
-                date: t.date ?? t.deadline ?? dateKey,
-                time: t.time ?? "09:00",
-                priority: (t.priority as "high" | "medium" | "low") ?? "medium",
-                category: (t.category as "work" | "personal" | "meeting" | "reminder") ?? "work",
-                completed: !!t.completed,
-                isImportant: !!t.isImportant || !!t.important,
-                isUrgent: !!t.isUrgent || !!t.urgent,
-                meetingAgenda: t.meetingAgenda,
-                attendees: Array.isArray(t.attendees) ? t.attendees.join(", ") : t.attendees,
-                owner_id: t.owner_id,
-                deadline: t.deadline,
-            }));
-        } else if (Array.isArray(data)) {
-            tasks = data.map((t: ApiTask) => ({
-                id: String(t.id ?? Date.now()),
-                title: t.title ?? "",
-                description: t.description ?? "",
-                date: t.date ?? t.deadline ?? dateKey,
-                time: t.time ?? "09:00",
-                priority: (t.priority as "high" | "medium" | "low") ?? "medium",
-                category: (t.category as "work" | "personal" | "meeting" | "reminder") ?? "work",
-                completed: !!t.completed,
-                isImportant: !!t.isImportant || !!t.important,
-                isUrgent: !!t.isUrgent || !!t.urgent,
-                meetingAgenda: t.meetingAgenda,
-                attendees: Array.isArray(t.attendees) ? t.attendees.join(", ") : t.attendees,
-                owner_id: t.owner_id,
-                deadline: t.deadline,
-            }));
-        } else {
-            throw new Error("Unexpected API response");
-        }
-
+        const { items } = await apiListUserSchedules({
+            start: range.start.toISOString(),
+            end: range.end.toISOString(),
+        });
+        const tasks = items.map((event) => mapEventToScheduleItem(event));
         const map = new Map<string, ScheduleItem>();
+        const startMillis = range.start.getTime();
+        const endMillis = range.end.getTime();
+
+        scheduleItems.value.forEach((existing) => {
+            const date = parseLocalDate(existing.date);
+            const time = date.getTime();
+            if (time < startMillis || time > endMillis) {
+                map.set(existing.id, existing);
+            }
+        });
+
         tasks.forEach((t) => map.set(t.id, t));
-        scheduleItems.value.forEach((p) => map.set(p.id, p));
         scheduleItems.value = Array.from(map.values());
     } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -245,14 +239,20 @@ const loadTasksFromApi = async () => {
         fetchError.value = error.message || "Failed to fetch tasks";
         const map = new Map<string, ScheduleItem>();
         mockScheduleData.forEach((t) => map.set(t.id, t));
-        scheduleItems.value.forEach((p) => map.set(p.id, p));
+        const startMillis = range.start.getTime();
+        const endMillis = range.end.getTime();
+        scheduleItems.value.forEach((existing) => {
+            const date = parseLocalDate(existing.date);
+            const time = date.getTime();
+            if (time < startMillis || time > endMillis) {
+                map.set(existing.id, existing);
+            }
+        });
         scheduleItems.value = Array.from(map.values());
     } finally {
         loadingTasks.value = false;
     }
 };
-
-watch(() => selectedDate.value, loadTasksFromApi, { immediate: true });
 
 const getCalendarDays = () => {
     const year = currentDate.value.getFullYear();
@@ -275,29 +275,55 @@ const getScheduleForDate = (date: Date) => {
     return scheduleItems.value.filter((item) => item.date === dateStr);
 };
 
-const handleSaveSchedule = (item: Omit<ScheduleItem, "id">) => {
-    const currentEditing = editingItem.value;
-    if (currentEditing) {
-        const index = scheduleItems.value.findIndex((i) => i.id === currentEditing.id);
-        if (index !== -1) {
-            scheduleItems.value[index] = { ...item, id: currentEditing.id };
+const handleSaveSchedule = async (item: Omit<ScheduleItem, "id">) => {
+    if (isSavingSchedule.value) return;
+    isSavingSchedule.value = true;
+    try {
+        const payload = buildScheduleRequest(item, editingItem.value);
+        const isDraftEdit = editingItem.value?.id.startsWith(DRAFT_ID_PREFIX) ?? false;
+        let saved: UserScheduleEvent;
+        if (editingItem.value && !isDraftEdit) {
+            saved = await apiUpdateUserSchedule(editingItem.value.id, payload);
+        } else {
+            saved = await apiCreateUserSchedule(payload);
         }
+        upsertScheduleItem(mapEventToScheduleItem(saved));
+        showAddModal.value = false;
         editingItem.value = null;
-    } else {
-        const newItem: ScheduleItem = {
-            ...item,
-            id: Date.now().toString(),
-        };
-        scheduleItems.value.push(newItem);
+    } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("Failed to save schedule", error);
+        fetchError.value = error.message || "保存日程失败";
+    } finally {
+        isSavingSchedule.value = false;
     }
-    showAddModal.value = false;
 };
 
-const handleDeleteSchedule = (id: string) => {
-    scheduleItems.value = scheduleItems.value.filter((item) => item.id !== id);
-    if (editingItem.value && editingItem.value.id === id) {
-        editingItem.value = null;
+const handleDeleteSchedule = async (id: string) => {
+    deletingScheduleId.value = id;
+    try {
+        await apiDeleteUserSchedule(id);
+        scheduleItems.value = scheduleItems.value.filter((item) => item.id !== id);
+        if (editingItem.value && editingItem.value.id === id) {
+            editingItem.value = null;
+            showAddModal.value = false;
+        }
+    } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("Failed to delete schedule", error);
+        fetchError.value = error.message || "删除日程失败";
+    } finally {
+        if (deletingScheduleId.value === id) {
+            deletingScheduleId.value = null;
+        }
     }
+};
+
+const handleProposalEdit = (proposal: ScheduleProposal) => {
+    const draft = convertProposalToScheduleItem(proposal);
+    editingItem.value = draft;
+    showAddModal.value = true;
+    showAIChat.value = false;
 };
 
 const toggleComplete = (id: string) => {
@@ -313,6 +339,44 @@ const toggleImportant = (id: string) => {
 const toggleUrgent = (id: string) => {
     const item = scheduleItems.value.find((i) => i.id === id);
     if (item) item.isUrgent = !item.isUrgent;
+};
+
+const formatTimeFromIso = (value?: string) => {
+    if (!value) return "00:00";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.slice(11, 16) || value;
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const mapEventToScheduleItem = (event: UserScheduleEvent): ScheduleItem => {
+    const start = new Date(event.startTime);
+    return {
+        id: event.id,
+        title: event.title,
+        description: event.description ?? "",
+        date: formatDateLocal(start),
+        time: formatTimeFromIso(event.startTime),
+        endTime: formatTimeFromIso(event.endTime),
+        startDateTime: event.startTime,
+        endDateTime: event.endTime,
+        priority: event.priority,
+        category: event.category,
+        completed: false,
+        isImportant: event.isImportant,
+        isUrgent: event.isUrgent,
+        meetingAgenda: event.description,
+        attendees: event.attendees,
+        timezone: event.timezone,
+    };
+};
+
+const upsertScheduleItem = (item: ScheduleItem) => {
+    const index = scheduleItems.value.findIndex((existing) => existing.id === item.id);
+    if (index === -1) {
+        scheduleItems.value.push(item);
+    } else {
+        scheduleItems.value[index] = item;
+    }
 };
 
 const quadrants = computed(() => {
@@ -382,6 +446,29 @@ const getPanelItems = (key: string) => {
 
 const calendarDays = computed(() => getCalendarDays());
 
+const calendarRange = computed(() => {
+    const days = calendarDays.value;
+    if (!days.length) return null;
+    const firstDay = days[0];
+    const lastDay = days[days.length - 1];
+    if (!firstDay || !lastDay) return null;
+    const start = new Date(firstDay);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(lastDay);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+});
+
+watch(
+    calendarRange,
+    (range) => {
+        if (range) {
+            loadTasksFromApi(range);
+        }
+    },
+    { immediate: true },
+);
+
 const handlePrevMonth = () => {
     currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1);
 };
@@ -400,60 +487,130 @@ const handleEdit = (item: ScheduleItem) => {
     editingItem.value = item;
     showAddModal.value = true;
 };
+
+const handleAiEventCreated = (event: UserScheduleEvent) => {
+    upsertScheduleItem(mapEventToScheduleItem(event));
+};
+
+const handleAiEventUpdated = (event: UserScheduleEvent) => {
+    upsertScheduleItem(mapEventToScheduleItem(event));
+};
+
+const handleAiEventDeleted = (id: string) => {
+    scheduleItems.value = scheduleItems.value.filter((item) => item.id !== id);
+};
+
+const handleAiQueryResult = (events: UserScheduleEvent[]) => {
+    events.forEach((event) => upsertScheduleItem(mapEventToScheduleItem(event)));
+};
 </script>
 
 <template>
-    <div class="bg-background h-full">
-        <div class="mx-auto px-4 py-6 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <div class="lg:col-span-2">
-                    <div class="rounded-lg bg-white p-5">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h2 class="text-base font-semibold text-gray-900">
-                                {{ currentDate.getFullYear() }}年{{ currentDate.getMonth() + 1 }}月
-                            </h2>
-                            <div class="flex space-x-1">
+    <div class="min-h-screen bg-gray-50 py-8">
+        <div class="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div class="mb-8 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 p-6 text-white shadow-2xl">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p class="text-sm text-white/80">当前日期</p>
+                        <p class="text-3xl font-semibold">
+                            {{ selectedDate.getMonth() + 1 }}月{{ selectedDate.getDate() }}日
+                        </p>
+                        <p class="text-sm text-white/70">
+                            时区：{{ browserTimezone }}
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button
+                            @click="showAIChat = true"
+                            type="button"
+                            class="rounded-full bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur transition hover:bg-white/30"
+                        >
+                            打开 AI 助手
+                        </button>
+                        <button
+                            type="button"
+                            @click="
+                                editingItem = null;
+                                showAddModal = true;
+                            "
+                            class="rounded-full bg-white px-5 py-2 text-sm font-semibold text-blue-600 shadow-md transition hover:bg-blue-50"
+                        >
+                            新建日程
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-6 grid gap-4 md:grid-cols-3">
+                    <div class="rounded-xl bg-white/10 p-4">
+                        <p class="text-sm uppercase tracking-wide text-white/80">今日任务</p>
+                        <p class="text-2xl font-semibold">
+                            {{ todoPanels.today.length }}
+                        </p>
+                    </div>
+                    <div class="rounded-xl bg-white/10 p-4">
+                        <p class="text-sm uppercase tracking-wide text-white/80">重要事项</p>
+                        <p class="text-2xl font-semibold">
+                            {{ quadrants.IU.length + quadrants.IN.length }}
+                        </p>
+                    </div>
+                    <div class="rounded-xl bg-white/10 p-4">
+                        <p class="text-sm uppercase tracking-wide text-white/80">已安排日程</p>
+                        <p class="text-2xl font-semibold">
+                            {{ scheduleItems.length }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                <div class="space-y-6 lg:col-span-2">
+                    <div class="rounded-2xl bg-white p-6 shadow-lg">
+                        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm text-gray-500">
+                                    {{ currentDate.getFullYear() }} 年
+                                </p>
+                                <h2 class="text-2xl font-semibold text-gray-900">
+                                    {{ currentDate.getMonth() + 1 }} 月
+                                </h2>
+                            </div>
+                            <div class="flex items-center gap-2">
                                 <button
                                     @click="handlePrevMonth"
-                                    class="rounded-md px-2 py-1 text-gray-700 hover:bg-gray-100"
+                                    class="rounded-full border border-white/40 bg-white/80 px-3 py-1 text-gray-700 transition hover:bg-white"
                                 >
-                                    ←
+                                    上一月
                                 </button>
                                 <button
                                     @click="handleToday"
-                                    class="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                                    class="rounded-full bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700"
                                 >
                                     今天
                                 </button>
                                 <button
                                     @click="handleNextMonth"
-                                    class="rounded-md px-2 py-1 text-gray-700 hover:bg-gray-100"
+                                    class="rounded-full border border-white/40 bg-white/80 px-3 py-1 text-gray-700 transition hover:bg-white"
                                 >
-                                    →
+                                    下一月
                                 </button>
                             </div>
                         </div>
 
-                        <div class="mb-3 grid grid-cols-7 gap-1">
-                            <div
-                                v-for="day in ['日', '一', '二', '三', '四', '五', '六']"
-                                :key="day"
-                                class="p-2 text-center text-xs font-semibold text-gray-700"
-                            >
+                        <div class="mb-4 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-gray-500">
+                            <div v-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day">
                                 {{ day }}
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-7 gap-1">
+                        <div class="grid grid-cols-7 gap-2">
                             <div
                                 v-for="(date, index) in calendarDays"
                                 :key="index"
                                 @click="selectedDate = date"
-                                class="group relative h-20 cursor-pointer border p-2 transition-colors select-none"
+                                class="group relative h-24 cursor-pointer rounded-xl border border-transparent bg-gray-50 p-3 text-left transition hover:border-blue-100 hover:bg-white"
                                 :class="[
                                     date.getMonth() === currentDate.getMonth()
-                                        ? 'border-gray-200 bg-white hover:bg-gray-50'
-                                        : 'border-gray-100 bg-gray-50 text-gray-400',
+                                        ? 'text-gray-900'
+                                        : 'text-gray-400',
                                     date.toDateString() === new Date().toDateString()
                                         ? 'border-blue-200 bg-blue-50'
                                         : '',
@@ -462,14 +619,20 @@ const handleEdit = (item: ScheduleItem) => {
                                         : '',
                                 ]"
                             >
-                                <div class="mb-1 text-sm font-medium text-gray-900">
-                                    {{ date.getDate() }}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-semibold">{{ date.getDate() }}</span>
+                                    <span
+                                        v-if="getScheduleForDate(date).length > 2"
+                                        class="rounded-full bg-blue-100 px-2 text-[11px] font-semibold text-blue-700"
+                                    >
+                                        +{{ getScheduleForDate(date).length - 2 }}
+                                    </span>
                                 </div>
-                                <div class="flex flex-col space-y-1">
+                                <div class="mt-2 space-y-1">
                                     <div
                                         v-for="schedule in getScheduleForDate(date).slice(0, 2)"
                                         :key="schedule.id"
-                                        class="inline-block w-fit truncate rounded-md px-1.5 py-0.5 text-[11px]"
+                                        class="w-full truncate rounded-md px-2 py-0.5 text-[11px]"
                                         :class="
                                             schedule.completed
                                                 ? 'bg-gray-200 text-gray-600 line-through'
@@ -477,12 +640,6 @@ const handleEdit = (item: ScheduleItem) => {
                                         "
                                     >
                                         {{ schedule.title }}
-                                    </div>
-                                    <div
-                                        v-if="getScheduleForDate(date).length > 2"
-                                        class="text-[11px] text-gray-500"
-                                    >
-                                        +{{ getScheduleForDate(date).length - 2 }}
                                     </div>
                                 </div>
 
@@ -493,28 +650,31 @@ const handleEdit = (item: ScheduleItem) => {
                                         showAddModal = true;
                                     "
                                     title="添加日程"
-                                    class="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm leading-none text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                    class="absolute -bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 shadow transition group-hover:opacity-100"
                                 >
-                                    +
+                                    <UIcon name="i-lucide-plus" class="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mt-4 rounded-lg bg-white p-4">
-                        <div class="mb-3 flex items-center justify-between">
-                            <h4 class="text-sm font-semibold text-gray-900">日程面板</h4>
-                            <div class="flex items-center gap-2">
+                    <div class="rounded-2xl bg-white p-5 shadow-lg">
+                        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm text-gray-500">今日概览</p>
+                                <h4 class="text-lg font-semibold text-gray-900">日程面板</h4>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3">
                                 <select
                                     v-model="todoSortBy"
-                                    class="rounded border px-2 py-1 text-sm"
+                                    class="rounded-full border border-gray-200 px-3 py-1 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                                 >
                                     <option value="time">按时间排序</option>
                                     <option value="importance">按重要性排序</option>
                                 </select>
                                 <select
                                     v-model="todoFilterCategory"
-                                    class="rounded border px-2 py-1 text-sm"
+                                    class="rounded-full border border-gray-200 px-3 py-1 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                                 >
                                     <option value="all">所有类别</option>
                                     <option value="work">工作</option>
@@ -522,14 +682,14 @@ const handleEdit = (item: ScheduleItem) => {
                                     <option value="meeting">会议</option>
                                     <option value="reminder">提醒</option>
                                 </select>
-                                <label class="flex items-center space-x-2 text-sm">
-                                    <input type="checkbox" v-model="showCompletedInList" />
+                                <label class="flex items-center space-x-2 text-sm text-gray-600">
+                                    <input type="checkbox" class="rounded" v-model="showCompletedInList" />
                                     <span>显示已完成</span>
                                 </label>
                             </div>
                         </div>
 
-                        <div class="flex flex-col space-y-3">
+                        <div class="flex flex-col space-y-4">
                             <div
                                 v-for="panel in [
                                     { key: 'today', title: '今日' },
@@ -537,17 +697,17 @@ const handleEdit = (item: ScheduleItem) => {
                                     { key: 'within7', title: '7 天内' },
                                 ]"
                                 :key="panel.key"
-                                class="rounded p-3"
+                                class="rounded-2xl border border-gray-100 bg-gray-50 p-4"
                             >
                                 <div class="mb-2 flex items-center justify-between">
-                                    <div class="text-sm font-medium text-gray-700">
+                                    <div class="text-sm font-medium text-gray-900">
                                         {{ panel.title }} ({{ getPanelItems(panel.key).length }})
                                     </div>
                                 </div>
                                 <div class="space-y-2">
                                     <div
                                         v-if="getPanelItems(panel.key).length === 0"
-                                        class="text-xs text-gray-400"
+                                        class="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-xs text-gray-400"
                                     >
                                         暂无任务
                                     </div>
@@ -555,7 +715,7 @@ const handleEdit = (item: ScheduleItem) => {
                                         v-else
                                         v-for="t in getPanelItems(panel.key)"
                                         :key="t.id"
-                                        class="flex items-center justify-between rounded border p-2"
+                                        class="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-3 shadow-sm"
                                     >
                                         <div class="flex min-w-0 items-center gap-3">
                                             <div
@@ -591,7 +751,7 @@ const handleEdit = (item: ScheduleItem) => {
                                             <button
                                                 @click="toggleComplete(t.id)"
                                                 :title="t.completed ? '标记未完成' : '标记完成'"
-                                                class="rounded px-2 py-1 text-xs"
+                                                class="rounded-full px-3 py-1 text-xs font-medium transition"
                                                 :class="
                                                     t.completed
                                                         ? 'bg-green-50 text-green-700'
@@ -603,7 +763,7 @@ const handleEdit = (item: ScheduleItem) => {
                                             <button
                                                 @click="toggleImportant(t.id)"
                                                 title="切换重要"
-                                                class="rounded px-2 py-1 text-xs"
+                                                class="rounded-full px-3 py-1 text-xs font-medium transition"
                                                 :class="
                                                     t.isImportant
                                                         ? 'bg-red-50 text-red-700'
@@ -615,7 +775,7 @@ const handleEdit = (item: ScheduleItem) => {
                                             <button
                                                 @click="toggleUrgent(t.id)"
                                                 title="切换紧急"
-                                                class="rounded px-2 py-1 text-xs"
+                                                class="rounded-full px-3 py-1 text-xs font-medium transition"
                                                 :class="
                                                     t.isUrgent
                                                         ? 'bg-orange-50 text-orange-700'
@@ -627,14 +787,15 @@ const handleEdit = (item: ScheduleItem) => {
                                             <button
                                                 @click="handleEdit(t)"
                                                 title="编辑"
-                                                class="rounded p-1 text-blue-600 hover:bg-blue-50"
+                                                class="rounded-full p-1 text-blue-600 transition hover:bg-blue-50"
                                             >
                                                 <UIcon name="i-lucide-edit" class="h-4 w-4" />
                                             </button>
                                             <button
                                                 @click="handleDeleteSchedule(t.id)"
                                                 title="删除"
-                                                class="rounded p-1 text-red-600 hover:bg-red-50"
+                                                class="rounded-full p-1 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                :disabled="deletingScheduleId === t.id"
                                             >
                                                 <UIcon name="i-lucide-trash" class="h-4 w-4" />
                                             </button>
@@ -647,9 +808,9 @@ const handleEdit = (item: ScheduleItem) => {
                 </div>
 
                 <div class="space-y-6">
-                    <div class="rounded-lg bg-white p-5">
-                        <div class="mb-3 flex items-center justify-between">
-                            <h3 class="text-base font-semibold text-gray-900">
+                    <div class="rounded-2xl bg-white p-5 shadow-lg">
+                        <div class="mb-4 flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">
                                 {{ selectedDate.getMonth() + 1 }}月{{ selectedDate.getDate() }}日
                             </h3>
                             <div class="flex items-center gap-2">
@@ -657,16 +818,17 @@ const handleEdit = (item: ScheduleItem) => {
                                     type="text"
                                     v-model="dailyGoals[formatDateLocal(selectedDate)]"
                                     placeholder="当日目标..."
-                                    class="w-56 rounded-md border border-gray-300 px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    class="w-56 rounded-full border border-gray-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                                 />
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-2 gap-3">
                             <QuadrantCard
                                 :title="
                                     isMounted ? `重要且紧急 (${quadrants.IU.length})` : '重要且紧急'
                                 "
                                 :items="quadrants.IU"
+                                :deleting-id="deletingScheduleId"
                                 @toggleComplete="toggleComplete"
                                 @toggleImportant="toggleImportant"
                                 @toggleUrgent="toggleUrgent"
@@ -678,6 +840,7 @@ const handleEdit = (item: ScheduleItem) => {
                                     isMounted ? `重要不紧急 (${quadrants.IN.length})` : '重要不紧急'
                                 "
                                 :items="quadrants.IN"
+                                :deleting-id="deletingScheduleId"
                                 @toggleComplete="toggleComplete"
                                 @toggleImportant="toggleImportant"
                                 @toggleUrgent="toggleUrgent"
@@ -691,6 +854,7 @@ const handleEdit = (item: ScheduleItem) => {
                                         : '不重要但紧急'
                                 "
                                 :items="quadrants.NU"
+                                :deleting-id="deletingScheduleId"
                                 @toggleComplete="toggleComplete"
                                 @toggleImportant="toggleImportant"
                                 @toggleUrgent="toggleUrgent"
@@ -704,6 +868,7 @@ const handleEdit = (item: ScheduleItem) => {
                                         : '不重要不紧急'
                                 "
                                 :items="quadrants.NN"
+                                :deleting-id="deletingScheduleId"
                                 @toggleComplete="toggleComplete"
                                 @toggleImportant="toggleImportant"
                                 @toggleUrgent="toggleUrgent"
@@ -713,11 +878,11 @@ const handleEdit = (item: ScheduleItem) => {
                         </div>
                     </div>
 
-                    <div class="rounded-lg bg-white p-5">
-                        <div class="mb-3 flex items-center justify-between">
-                            <div class="flex items-center">
-                                <UIcon name="i-lucide-bot" class="mr-2 text-blue-600" />
-                                <h3 class="text-base font-semibold text-gray-900">AI智能建议</h3>
+                    <div class="rounded-2xl bg-white p-5 shadow-lg">
+                        <div class="mb-4 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <UIcon name="i-lucide-bot" class="text-blue-600" />
+                                <h3 class="text-lg font-semibold text-gray-900">AI 智能建议</h3>
                             </div>
                             <UButton
                                 size="xs"
@@ -729,7 +894,7 @@ const handleEdit = (item: ScheduleItem) => {
                             </UButton>
                         </div>
                         <div class="space-y-3">
-                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <div class="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
                                 <div class="flex items-start">
                                     <UIcon
                                         name="i-lucide-alert-circle"
@@ -745,7 +910,7 @@ const handleEdit = (item: ScheduleItem) => {
                                     </div>
                                 </div>
                             </div>
-                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <div class="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
                                 <div class="flex items-start">
                                     <div
                                         class="mt-0.5 mr-2 h-4 w-4 rounded-full bg-green-500"
@@ -758,7 +923,7 @@ const handleEdit = (item: ScheduleItem) => {
                                     </div>
                                 </div>
                             </div>
-                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <div class="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
                                 <div class="flex items-start">
                                     <div class="mt-0.5 mr-2 h-4 w-4 rounded-full bg-blue-500"></div>
                                     <div>
@@ -775,44 +940,22 @@ const handleEdit = (item: ScheduleItem) => {
             </div>
         </div>
 
-        <div
-            v-if="showAIChat"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        >
-            <div
-                class="mx-4 flex h-3/4 w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white"
-            >
-                <div class="flex items-center justify-between border-b p-4">
-                    <div class="flex items-center">
-                        <UIcon name="i-lucide-bot" class="mr-2 text-blue-600" />
-                        <h3 class="text-base font-semibold">AI日程助手</h3>
-                    </div>
-                    <button @click="showAIChat = false" class="text-gray-500 hover:text-gray-700">
-                        <UIcon name="i-lucide-x" />
-                    </button>
-                </div>
-
-                <div ref="messagesContainer" class="flex flex-1 flex-col overflow-y-auto p-4">
-                    <ChatsMessages :messages="aiMessages" class="flex-1" />
-                </div>
-
-                <div class="border-t p-4">
-                    <ChatsPrompt
-                        v-model="aiInput"
-                        :rows="1"
-                        :is-loading="isLoading"
-                        :show-file-upload="false"
-                        placeholder="输入您的需求，AI助手会帮您管理日程..."
-                        @submit="sendAIMessage"
-                    />
-                </div>
-            </div>
-        </div>
+        <AIChatWidget
+            v-model:open="showAIChat"
+            :model-id="defaultModelId || undefined"
+            :timezone="browserTimezone"
+            @event-created="handleAiEventCreated"
+            @event-updated="handleAiEventUpdated"
+            @event-deleted="handleAiEventDeleted"
+            @query-result="handleAiQueryResult"
+            @edit-proposal="handleProposalEdit"
+        />
 
         <ScheduleModal
             :isOpen="showAddModal"
             :editingItem="editingItem"
             :selectedDate="selectedDate"
+            :saving="isSavingSchedule"
             @close="
                 showAddModal = false;
                 editingItem = null;

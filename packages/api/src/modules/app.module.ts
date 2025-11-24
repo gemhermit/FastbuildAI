@@ -44,6 +44,7 @@ import { SystemModule } from "./system/system.module";
 import { TagModule } from "./tag/tag.module";
 import { UploadModule } from "./upload/upload.module";
 import { UserModule } from "./user/user.module";
+import { UserScheduleModule } from "./user-schedule/user-schedule.module";
 
 @Module({})
 export class AppModule {
@@ -105,6 +106,7 @@ export class AppModule {
                 AnalyseModule,
                 SecretModule,
                 UserModule,
+                UserScheduleModule,
                 await ExtensionCoreModule.register(),
             ],
             controllers: [],

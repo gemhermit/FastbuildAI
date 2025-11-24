@@ -5,6 +5,7 @@ import type { ScheduleItem } from "../types";
 defineProps<{
     title: string;
     items: ScheduleItem[];
+    deletingId?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -120,8 +121,9 @@ const emit = defineEmits<{
                         </button>
                         <button
                             @click="emit('delete', schedule.id)"
-                            class="rounded p-1 text-red-600 hover:bg-red-50"
+                            class="rounded p-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             title="删除"
+                            :disabled="$props.deletingId === schedule.id"
                         >
                             <UIcon name="i-lucide-trash" class="h-4 w-4" />
                         </button>

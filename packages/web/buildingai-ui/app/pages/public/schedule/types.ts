@@ -4,6 +4,9 @@ export interface ScheduleItem {
     description: string;
     date: string;
     time: string;
+    endTime?: string;
+    startDateTime?: string;
+    endDateTime?: string;
     priority: "high" | "medium" | "low";
     category: "work" | "personal" | "meeting" | "reminder";
     completed: boolean;
@@ -13,6 +16,7 @@ export interface ScheduleItem {
     attendees?: string;
     owner_id?: string;
     deadline?: string;
+    timezone?: string;
 }
 
 export interface AIMessage {

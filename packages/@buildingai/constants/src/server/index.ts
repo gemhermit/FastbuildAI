@@ -1,1 +1,1 @@
-export * from "./decorators-key.constant";
+export * from "./decorators-key.constant.js";

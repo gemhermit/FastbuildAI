@@ -8,6 +8,7 @@ const props = defineProps<{
     isOpen: boolean;
     editingItem: ScheduleItem | null;
     selectedDate: Date;
+    saving?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -28,6 +29,8 @@ const formData = ref({
     meetingAgenda: "",
     attendees: "",
 });
+
+const showAdvanced = ref(false);
 
 watch(
     () => [props.editingItem, props.selectedDate],
@@ -84,153 +87,178 @@ const handleSubmit = () => {
 </script>
 
 <template>
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div class="mx-4 w-full max-w-md rounded-lg bg-white">
-            <div class="p-5">
-                <h3 class="mb-3 text-base font-semibold">
-                    {{ editingItem ? "编辑日程" : "添加日程" }}
-                </h3>
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-widest text-gray-400">
+                        {{ editingItem ? "编辑日程" : "新建日程" }}
+                    </p>
+                    <h3 class="text-xl font-semibold text-gray-900">
+                        {{ formData.title || "输入标题" }}
+                    </h3>
+                </div>
+                <button
+                    class="text-gray-400 transition hover:text-gray-600"
+                    type="button"
+                    @click="emit('close')"
+                >
+                    <UIcon name="i-lucide-x" class="h-5 w-5" />
+                </button>
+            </div>
 
-                <form @submit.prevent="handleSubmit" class="space-y-4">
+            <form @submit.prevent="handleSubmit" class="space-y-6">
+                <div class="space-y-4">
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700"> 标题 </label>
+                        <label class="block text-sm font-medium text-gray-600">标题</label>
                         <input
-                            type="text"
                             v-model="formData.title"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            type="text"
+                            placeholder="输入日程标题"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-base focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                             required
                         />
                     </div>
 
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">日期</label>
+                            <input
+                                v-model="formData.date"
+                                type="date"
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">时间</label>
+                            <div class="relative">
+                                <input
+                                    v-model="formData.time"
+                                    type="time"
+                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                    required
+                                />
+                                <span
+                                    class="material-icons-outlined pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400"
+                                >
+                                    schedule
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700"> 描述 </label>
-                        <textarea
-                            v-model="formData.description"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            rows="3"
+                        <label class="block text-sm font-medium text-gray-600">与会人</label>
+                        <input
+                            v-model="formData.attendees"
+                            type="text"
+                            placeholder="添加与会人..."
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                         />
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                                日期
-                            </label>
-                            <input
-                                type="date"
-                                v-model="formData.date"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                required
-                            />
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">备注</label>
+                        <textarea
+                            v-model="formData.description"
+                            rows="3"
+                            placeholder="添加描述或背景信息..."
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-dashed border-gray-200 p-4">
+                    <button
+                        type="button"
+                        class="flex w-full items-center justify-between text-sm font-medium text-gray-600"
+                        @click="showAdvanced = !showAdvanced"
+                    >
+                        <span>更多选项</span>
+                        <UIcon
+                            name="i-lucide-chevron-down"
+                            class="h-4 w-4 transition"
+                            :class="showAdvanced ? 'rotate-180' : ''"
+                        />
+                    </button>
+
+                    <div v-if="showAdvanced" class="mt-4 space-y-4 border-t border-gray-100 pt-4">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600">类别</label>
+                                <select
+                                    v-model="formData.category"
+                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                >
+                                    <option value="work">工作</option>
+                                    <option value="personal">个人</option>
+                                    <option value="meeting">会议</option>
+                                    <option value="reminder">提醒</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600">优先级</label>
+                                <select
+                                    v-model="formData.priority"
+                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                >
+                                    <option value="low">低</option>
+                                    <option value="medium">中</option>
+                                    <option value="high">高</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                                时间
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <label class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                                <input type="checkbox" class="rounded" v-model="formData.isImportant" />
+                                <span>标记为重要</span>
                             </label>
-                            <input
-                                type="time"
-                                v-model="formData.time"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                required
-                            />
+                            <label class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                                <input type="checkbox" class="rounded" v-model="formData.isUrgent" />
+                                <span>标记为紧急</span>
+                            </label>
+                        </div>
+
+                        <div v-if="formData.category === 'meeting'" class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600">会议议程</label>
+                                <input
+                                    type="text"
+                                    v-model="formData.meetingAgenda"
+                                    placeholder="例如：项目评审、方案确认"
+                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                />
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="flex items-center gap-2">
-                            <input
-                                id="important"
-                                type="checkbox"
-                                v-model="formData.isImportant"
-                                class="h-4 w-4"
-                            />
-                            <label htmlFor="important" class="text-sm text-gray-700"> 重要 </label>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <input
-                                id="urgent"
-                                type="checkbox"
-                                v-model="formData.isUrgent"
-                                class="h-4 w-4"
-                            />
-                            <label htmlFor="urgent" class="text-sm text-gray-700"> 紧急 </label>
-                        </div>
-                    </div>
-
-                    <template v-if="formData.category === 'meeting'">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                                会议事项/议程
-                            </label>
-                            <input
-                                type="text"
-                                v-model="formData.meetingAgenda"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                placeholder="例如：需求评审、方案定稿、问题清单"
-                            />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                                与会人
-                            </label>
-                            <input
-                                type="text"
-                                v-model="formData.attendees"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                placeholder="例如：产品、研发、测试、市场"
-                            />
-                        </div>
-                    </template>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                                优先级
-                            </label>
-                            <select
-                                v-model="formData.priority"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            >
-                                <option value="low">低</option>
-                                <option value="medium">中</option>
-                                <option value="high">高</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                                类别
-                            </label>
-                            <select
-                                v-model="formData.category"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            >
-                                <option value="work">工作</option>
-                                <option value="personal">个人</option>
-                                <option value="meeting">会议</option>
-                                <option value="reminder">提醒</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 pt-4">
-                        <button
-                            type="button"
-                            @click="emit('close')"
-                            class="rounded-md border border-gray-300 px-4 py-2 text-gray-600 hover:bg-gray-50"
-                        >
-                            取消
-                        </button>
-                        <button
-                            type="submit"
-                            class="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                        >
-                            {{ editingItem ? "更新" : "添加" }}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                <div class="flex justify-end gap-3">
+                    <button
+                        type="button"
+                        @click="emit('close')"
+                        class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                        :disabled="props.saving"
+                    >
+                        取消
+                    </button>
+                    <button
+                        type="submit"
+                        class="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                        :disabled="props.saving"
+                    >
+                        {{
+                            props.saving
+                                ? "保存中..."
+                                : editingItem
+                                  ? "更新日程"
+                                  : "创建日程"
+                        }}
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </template>
