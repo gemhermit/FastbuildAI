@@ -2,6 +2,7 @@ export const priorityColors = {
     high: "bg-red-500",
     medium: "bg-yellow-500",
     low: "bg-green-500",
+    none: "bg-gray-300",
 };
 
 export const categoryIcons = {
@@ -9,4 +10,5 @@ export const categoryIcons = {
     personal: "👤",
     meeting: "🤝",
     reminder: "⏰",
+    uncategorized: "📁",
 };

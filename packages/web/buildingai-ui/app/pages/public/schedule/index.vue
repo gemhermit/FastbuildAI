@@ -127,6 +127,18 @@ const mockScheduleData: ScheduleItem[] = [
 
 const DEFAULT_EVENT_DURATION = 60 * 60 * 1000;
 const DRAFT_ID_PREFIX = "__draft__";
+type ApiCategory = Exclude<ScheduleItem["category"], "uncategorized">;
+type ApiPriority = Exclude<ScheduleItem["priority"], "none">;
+
+const normalizeCategoryForRequest = (value?: ScheduleItem["category"]): ApiCategory | undefined => {
+    if (!value || value === "uncategorized") return undefined;
+    return value;
+};
+
+const normalizePriorityForRequest = (value?: ScheduleItem["priority"]): ApiPriority | undefined => {
+    if (!value || value === "none") return undefined;
+    return value;
+};
 
 const combineLocalDateTime = (dateStr: string | undefined, timeStr: string | undefined) => {
     const normalizedDate = dateStr || formatDateLocal(new Date());
@@ -191,8 +203,8 @@ const buildScheduleRequest = (item: Omit<ScheduleItem, "id">, existing?: Schedul
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         attendees: attendees || undefined,
-        category: item.category,
-        priority: item.priority,
+        category: normalizeCategoryForRequest(item.category),
+        priority: normalizePriorityForRequest(item.priority),
         isImportant: item.isImportant,
         isUrgent: item.isUrgent,
         timezone: existing?.timezone || browserTimezone.value,
@@ -218,8 +230,8 @@ const convertProposalToScheduleItem = (proposal: ScheduleProposal): ScheduleItem
         endTime: formatTimeFromIso(data.endTime),
         startDateTime: data.startTime,
         endDateTime: data.endTime,
-        priority: data.priority || "medium",
-        category: data.category || "work",
+        priority: data.priority || "none",
+        category: data.category || "uncategorized",
         completed: data.completed ?? false,
         isImportant: data.isImportant,
         isUrgent: data.isUrgent,

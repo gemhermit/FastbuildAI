@@ -7,8 +7,8 @@ export interface ScheduleItem {
     endTime?: string;
     startDateTime?: string;
     endDateTime?: string;
-    priority: "high" | "medium" | "low";
-    category: "work" | "personal" | "meeting" | "reminder";
+    priority: "high" | "medium" | "low" | "none";
+    category: "work" | "personal" | "meeting" | "reminder" | "uncategorized";
     completed: boolean;
     isImportant?: boolean;
     isUrgent?: boolean;

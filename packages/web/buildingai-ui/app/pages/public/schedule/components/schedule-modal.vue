@@ -28,8 +28,13 @@ const formData = ref({
     description: "",
     date: "",
     time: "09:00",
-    priority: "medium" as "high" | "medium" | "low",
-    category: "work" as "work" | "personal" | "meeting" | "reminder",
+    priority: "none" as "high" | "medium" | "low" | "none",
+    category: "uncategorized" as
+        | "work"
+        | "personal"
+        | "meeting"
+        | "reminder"
+        | "uncategorized",
     completed: false,
     isImportant: false,
     isUrgent: false,
@@ -75,8 +80,8 @@ watch(
                 description: "",
                 date: formatDateLocal(props.selectedDate),
                 time: "09:00",
-                priority: "medium",
-                category: "work",
+                priority: "none",
+                category: "uncategorized",
                 completed: false,
                 isImportant: false,
                 isUrgent: false,
@@ -130,39 +135,6 @@ const handleSubmit = () => {
                         />
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-600">日期</label>
-                            <input
-                                v-model="formData.date"
-                                type="date"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-600">时间</label>
-                            <div class="flex items-center gap-2">
-                                <input
-                                    v-model="formData.time"
-                                    type="time"
-                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                                    required
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600">与会人</label>
-                        <input
-                            v-model="formData.attendees"
-                            type="text"
-                            placeholder="添加与会人..."
-                            class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                    </div>
-
                     <div>
                         <label class="block text-sm font-medium text-gray-600">备注</label>
                         <textarea
@@ -191,11 +163,45 @@ const handleSubmit = () => {
                     <div v-if="showAdvanced" class="mt-4 space-y-4 border-t border-gray-100 pt-4">
                         <div class="grid gap-4 md:grid-cols-2">
                             <div>
+                                <label class="block text-sm font-medium text-gray-600">日期</label>
+                                <input
+                                    v-model="formData.date"
+                                    type="date"
+                                    class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600">时间</label>
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        v-model="formData.time"
+                                        type="time"
+                                        class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">与会人</label>
+                            <input
+                                v-model="formData.attendees"
+                                type="text"
+                                placeholder="添加与会人..."
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            />
+                        </div>
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
                                 <label class="block text-sm font-medium text-gray-600">类别</label>
                                 <select
                                     v-model="formData.category"
                                     class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                                 >
+                                    <option value="uncategorized">未分类</option>
                                     <option value="work">工作</option>
                                     <option value="personal">个人</option>
                                     <option value="meeting">会议</option>
@@ -210,6 +216,7 @@ const handleSubmit = () => {
                                     v-model="formData.priority"
                                     class="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                                 >
+                                    <option value="none">无</option>
                                     <option value="low">低</option>
                                     <option value="medium">中</option>
                                     <option value="high">高</option>

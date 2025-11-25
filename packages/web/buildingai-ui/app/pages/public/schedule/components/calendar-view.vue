@@ -147,7 +147,6 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
     <div class="rounded-2xl bg-white p-6 shadow-lg">
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="text-sm text-gray-500">智能日历</p>
                 <h3 class="text-xl font-semibold text-gray-900">{{ headerTitle }}</h3>
                 <div class="mt-2 flex items-center gap-2 text-xs text-gray-500">
                     <button

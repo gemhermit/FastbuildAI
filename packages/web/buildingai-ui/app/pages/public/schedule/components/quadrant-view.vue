@@ -23,12 +23,16 @@ const emit = defineEmits<{
     (e: "updateTitle", payload: { id: string; title: string }): void;
 }>();
 
+const priorityIsHigh = (priority: ScheduleItem["priority"]) => priority === "high";
+const priorityIsAtLeastMedium = (priority: ScheduleItem["priority"]) =>
+    priority === "high" || priority === "medium";
+
 const quadrants = computed(() => ({
     IU: props.scheduleItems.filter(
-        (i) => (i.isImportant ?? i.priority === "high") && (i.isUrgent ?? false),
+        (i) => (i.isImportant ?? priorityIsHigh(i.priority)) && (i.isUrgent ?? false),
     ),
     IN: props.scheduleItems.filter(
-        (i) => (i.isImportant ?? i.priority !== "low") && !(i.isUrgent ?? false),
+        (i) => (i.isImportant ?? priorityIsAtLeastMedium(i.priority)) && !(i.isUrgent ?? false),
     ),
     NU: props.scheduleItems.filter((i) => !(i.isImportant ?? false) && (i.isUrgent ?? false)),
     NN: props.scheduleItems.filter((i) => !(i.isImportant ?? false) && !(i.isUrgent ?? false)),

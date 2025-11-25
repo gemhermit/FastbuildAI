@@ -33,7 +33,9 @@ const emit = defineEmits<{
 
 const todoSortBy = ref<"time" | "importance">(props.sortBy ?? "time");
 const sortOrder = ref<"asc" | "desc">("asc");
-const todoFilterCategory = ref<"all" | "work" | "personal" | "meeting" | "reminder">("all");
+const todoFilterCategory = ref<
+    "all" | "work" | "personal" | "meeting" | "reminder" | "uncategorized"
+>("all");
 const showCompletedInList = ref(true);
 const filterImportantOnly = ref(false);
 const filterUrgentOnly = ref(false);
@@ -47,7 +49,7 @@ const restoreListPrefs = () => {
         const parsed = JSON.parse(raw) as Partial<{
             sortBy: "time" | "importance";
             sortOrder: "asc" | "desc";
-            filter: "all" | "work" | "personal" | "meeting" | "reminder";
+            filter: "all" | "work" | "personal" | "meeting" | "reminder" | "uncategorized";
             showCompleted: boolean;
             importantOnly: boolean;
             urgentOnly: boolean;
@@ -121,7 +123,12 @@ const sortList = (list: ScheduleItem[]) => {
     if (effectiveSort.value === "time") {
         copy.sort((a, b) => (timeValue(a) - timeValue(b)) * dir);
     } else {
-        const priRank = (p: string) => (p === "high" ? 3 : p === "medium" ? 2 : 1);
+        const priRank = (p: string) => {
+            if (p === "high") return 3;
+            if (p === "medium") return 2;
+            if (p === "low") return 1;
+            return 0;
+        };
         copy.sort((a, b) => {
             const ai = a.isImportant ? 1 : 0;
             const bi = b.isImportant ? 1 : 0;
@@ -137,16 +144,20 @@ const sortList = (list: ScheduleItem[]) => {
     return copy;
 };
 
-const groupedByDate = computed(() => {
+const groupedByDate = computed<[string, ScheduleItem[]][]>(() => {
     const map = new Map<string, ScheduleItem[]>();
     sortedTasks.value.forEach((task) => {
         const list = map.get(task.date) ?? [];
         list.push(task);
         map.set(task.date, list);
     });
-    return Array.from(map.entries()).sort(
-        ([a], [b]) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime(),
+    const orderedDates = Array.from(map.keys()).sort(
+        (a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime(),
     );
+    if (sortOrder.value === "desc" && effectiveSort.value === "time") {
+        orderedDates.reverse();
+    }
+    return orderedDates.map((date) => [date, map.get(date) ?? []] as [string, ScheduleItem[]]);
 });
 
 const formatCompactDate = (value: string) => {
@@ -228,6 +239,7 @@ const toggleSortOrder = () => {
                 <option value="personal">个人</option>
                 <option value="meeting">会议</option>
                 <option value="reminder">提醒</option>
+                <option value="uncategorized">未分类</option>
             </select>
             <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input v-model="showCompletedInList" type="checkbox" class="h-4 w-4 rounded" />
