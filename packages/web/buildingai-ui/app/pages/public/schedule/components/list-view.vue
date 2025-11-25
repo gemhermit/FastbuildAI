@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 
 import { categoryIcons } from "../constants";
 import type { ScheduleItem } from "../types";
-import { formatDateLocal, formatDisplayDateFromString, parseLocalDate } from "../utils";
+import { parseLocalDate } from "../utils";
 import EmptyHoverActions from "./empty-hover-actions.vue";
 
 const props = withDefaults(
@@ -32,8 +32,11 @@ const emit = defineEmits<{
 }>();
 
 const todoSortBy = ref<"time" | "importance">(props.sortBy ?? "time");
+const sortOrder = ref<"asc" | "desc">("asc");
 const todoFilterCategory = ref<"all" | "work" | "personal" | "meeting" | "reminder">("all");
 const showCompletedInList = ref(true);
+const filterImportantOnly = ref(false);
+const filterUrgentOnly = ref(false);
 const LIST_PREF_KEY = "schedule:list-view-prefs";
 
 const restoreListPrefs = () => {
@@ -43,13 +46,20 @@ const restoreListPrefs = () => {
         if (!raw) return;
         const parsed = JSON.parse(raw) as Partial<{
             sortBy: "time" | "importance";
+            sortOrder: "asc" | "desc";
             filter: "all" | "work" | "personal" | "meeting" | "reminder";
             showCompleted: boolean;
+            importantOnly: boolean;
+            urgentOnly: boolean;
         }>;
         if (parsed.sortBy) todoSortBy.value = parsed.sortBy;
+        if (parsed.sortOrder) sortOrder.value = parsed.sortOrder;
         if (parsed.filter) todoFilterCategory.value = parsed.filter;
         if (typeof parsed.showCompleted === "boolean")
             showCompletedInList.value = parsed.showCompleted;
+        if (typeof parsed.importantOnly === "boolean")
+            filterImportantOnly.value = parsed.importantOnly;
+        if (typeof parsed.urgentOnly === "boolean") filterUrgentOnly.value = parsed.urgentOnly;
     } catch (err) {
         console.warn("Failed to restore list prefs", err);
     }
@@ -59,8 +69,11 @@ const persistListPrefs = () => {
     if (typeof window === "undefined") return;
     const payload = {
         sortBy: todoSortBy.value,
+        sortOrder: sortOrder.value,
         filter: todoFilterCategory.value,
         showCompleted: showCompletedInList.value,
+        importantOnly: filterImportantOnly.value,
+        urgentOnly: filterUrgentOnly.value,
     };
     window.localStorage.setItem(LIST_PREF_KEY, JSON.stringify(payload));
 };
@@ -69,10 +82,18 @@ onMounted(() => {
     restoreListPrefs();
 });
 
-watch([todoSortBy, todoFilterCategory, showCompletedInList], persistListPrefs);
-
-const todayKey = computed(() => formatDateLocal(new Date()));
-const selectedKey = computed(() => formatDateLocal(props.selectedDate));
+watch(
+    [
+        todoSortBy,
+        sortOrder,
+        todoFilterCategory,
+        showCompletedInList,
+        filterImportantOnly,
+        filterUrgentOnly,
+    ],
+    persistListPrefs,
+    { deep: false },
+);
 
 const effectiveSort = computed(() => props.sortBy ?? todoSortBy.value);
 const showCompletedFlag = computed(() => props.showCompleted ?? showCompletedInList.value);
@@ -82,21 +103,35 @@ const filteredTasks = computed(() =>
         if (todoFilterCategory.value !== "all" && task.category !== todoFilterCategory.value)
             return false;
         if (!showCompletedFlag.value && task.completed) return false;
+        if (filterImportantOnly.value && !task.isImportant) return false;
+        if (filterUrgentOnly.value && !task.isUrgent) return false;
         return true;
     }),
 );
 
+const sortedTasks = computed(() => sortList(filteredTasks.value));
+
 const sortList = (list: ScheduleItem[]) => {
     const copy = [...list];
+    const dir = sortOrder.value === "asc" ? 1 : -1;
+    const timeValue = (item: ScheduleItem) => {
+        const [h = "00", m = "00"] = (item.time || "00:00").split(":");
+        return Number(h) * 60 + Number(m);
+    };
     if (effectiveSort.value === "time") {
-        copy.sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"));
+        copy.sort((a, b) => (timeValue(a) - timeValue(b)) * dir);
     } else {
         const priRank = (p: string) => (p === "high" ? 3 : p === "medium" ? 2 : 1);
         copy.sort((a, b) => {
             const ai = a.isImportant ? 1 : 0;
             const bi = b.isImportant ? 1 : 0;
-            if (ai !== bi) return bi - ai;
-            return priRank(String(b.priority)) - priRank(String(a.priority));
+            if (ai !== bi) return (bi - ai) * dir;
+            const au = a.isUrgent ? 1 : 0;
+            const bu = b.isUrgent ? 1 : 0;
+            if (au !== bu) return (bu - au) * dir;
+            const priDiff = priRank(String(b.priority)) - priRank(String(a.priority));
+            if (priDiff !== 0) return priDiff * dir;
+            return (timeValue(a) - timeValue(b)) * dir;
         });
     }
     return copy;
@@ -104,7 +139,7 @@ const sortList = (list: ScheduleItem[]) => {
 
 const groupedByDate = computed(() => {
     const map = new Map<string, ScheduleItem[]>();
-    sortList(filteredTasks.value).forEach((task) => {
+    sortedTasks.value.forEach((task) => {
         const list = map.get(task.date) ?? [];
         list.push(task);
         map.set(task.date, list);
@@ -150,6 +185,10 @@ const cancelEditing = () => {
     editingId.value = null;
     editingValue.value = "";
 };
+
+const toggleSortOrder = () => {
+    sortOrder.value = sortOrder.value === "asc" ? "desc" : "asc";
+};
 </script>
 
 <template>
@@ -165,6 +204,21 @@ const cancelEditing = () => {
                 <option value="time">按时间排序</option>
                 <option value="importance">按重要性排序</option>
             </select>
+            <button
+                type="button"
+                @click="toggleSortOrder"
+                class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-700 transition hover:border-blue-200 hover:text-blue-700"
+            >
+                {{ sortOrder === "asc" ? "顺序" : "倒序" }}
+                <UIcon
+                    :name="
+                        sortOrder === 'asc'
+                            ? 'i-lucide-arrow-up-narrow-wide'
+                            : 'i-lucide-arrow-down-narrow-wide'
+                    "
+                    class="h-4 w-4"
+                />
+            </button>
             <select
                 v-model="todoFilterCategory"
                 class="rounded-full border border-gray-200 px-3 py-1 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -179,13 +233,14 @@ const cancelEditing = () => {
                 <input v-model="showCompletedInList" type="checkbox" class="h-4 w-4 rounded" />
                 显示已完成
             </label>
-            <div
-                class="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
-            >
-                <span>今日：{{ formatDisplayDateFromString(todayKey) }}</span>
-                <span class="h-3 w-px bg-gray-300"></span>
-                <span>已选：{{ formatDisplayDateFromString(selectedKey) }}</span>
-            </div>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input v-model="filterImportantOnly" type="checkbox" class="h-4 w-4 rounded" />
+                只看重要
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input v-model="filterUrgentOnly" type="checkbox" class="h-4 w-4 rounded" />
+                只看紧急
+            </label>
         </div>
 
         <div
