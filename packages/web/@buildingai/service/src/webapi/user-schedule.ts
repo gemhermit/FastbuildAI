@@ -16,6 +16,8 @@ export interface UserScheduleEvent {
     timezone?: string;
     createdAt: string;
     updatedAt: string;
+    completed?: boolean;
+    metadata?: Record<string, any>;
 }
 
 export interface ScheduleProposalPayload {
@@ -30,6 +32,8 @@ export interface ScheduleProposalPayload {
     isImportant?: boolean;
     isUrgent?: boolean;
     timezone?: string;
+    completed?: boolean;
+    metadata?: Record<string, any>;
 }
 
 export interface ScheduleProposal {
@@ -92,6 +96,8 @@ export interface SaveUserScheduleRequest {
     priority?: UserScheduleEvent["priority"];
     isImportant?: boolean;
     isUrgent?: boolean;
+    completed?: boolean;
+    metadata?: Record<string, any>;
 }
 
 export function apiListUserSchedules(

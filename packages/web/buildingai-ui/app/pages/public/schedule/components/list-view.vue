@@ -6,14 +6,19 @@ import type { ScheduleItem } from "../types";
 import { formatDateLocal, formatDisplayDateFromString, parseLocalDate } from "../utils";
 import EmptyHoverActions from "./empty-hover-actions.vue";
 
-const props = defineProps<{
-    selectedDate: Date;
-    scheduleItems: ScheduleItem[];
-    deletingId: string | null;
-    variant?: "default" | "compact";
-    sortBy?: "time" | "importance";
-    showCompleted?: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        selectedDate: Date;
+        scheduleItems: ScheduleItem[];
+        deletingId: string | null;
+        variant?: "default" | "compact";
+        sortBy?: "time" | "importance";
+        showCompleted?: boolean;
+    }>(),
+    {
+        showCompleted: undefined,
+    },
+);
 
 const emit = defineEmits<{
     (e: "toggleComplete", id: string): void;
@@ -23,11 +28,12 @@ const emit = defineEmits<{
     (e: "delete", id: string): void;
     (e: "create"): void;
     (e: "openAi"): void;
+    (e: "updateTitle", payload: { id: string; title: string }): void;
 }>();
 
 const todoSortBy = ref<"time" | "importance">(props.sortBy ?? "time");
 const todoFilterCategory = ref<"all" | "work" | "personal" | "meeting" | "reminder">("all");
-const showCompletedInList = ref(false);
+const showCompletedInList = ref(true);
 
 const todayKey = computed(() => formatDateLocal(new Date()));
 const selectedKey = computed(() => formatDateLocal(props.selectedDate));
@@ -79,6 +85,34 @@ const formatCompactDate = (value: string) => {
         month: "2-digit",
         day: "2-digit",
     });
+};
+
+const editingId = ref<string | null>(null);
+const editingValue = ref("");
+
+const startEditing = (item: ScheduleItem) => {
+    editingId.value = item.id;
+    editingValue.value = item.title;
+    requestAnimationFrame(() => {
+        const el = document.getElementById(`inline-input-${item.id}`) as HTMLInputElement | null;
+        el?.focus();
+        el?.select();
+    });
+};
+
+const commitEditing = (item: ScheduleItem) => {
+    if (!editingId.value) return;
+    const newTitle = editingValue.value.trim();
+    if (newTitle && newTitle !== item.title) {
+        emit("updateTitle", { id: item.id, title: newTitle });
+    }
+    editingId.value = null;
+    editingValue.value = "";
+};
+
+const cancelEditing = () => {
+    editingId.value = null;
+    editingValue.value = "";
 };
 </script>
 
@@ -132,7 +166,7 @@ const formatCompactDate = (value: string) => {
             <div v-else class="space-y-4">
                 <div v-for="[date, items] in groupedByDate" :key="date" class="space-y-2">
                     <div class="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                        <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                        <span class="h-2 w-2 rounded-full bg-blue-500"></span>
                         <span>{{ formatCompactDate(date) }}</span>
                     </div>
                     <div class="space-y-1.5">
@@ -140,26 +174,40 @@ const formatCompactDate = (value: string) => {
                             v-for="t in items"
                             :key="t.id"
                             class="flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-gray-50"
-                            @dblclick="emit('edit', t)"
+                            @dblclick="startEditing(t)"
                         >
                             <button
-                                class="flex h-4 w-4 items-center justify-center rounded-full border border-amber-400 text-amber-500 transition hover:bg-amber-50"
-                                :class="t.completed ? 'bg-amber-500 text-white' : ''"
+                                class="flex h-4 w-4 items-center justify-center rounded-full border border-blue-400 text-blue-500 transition hover:bg-blue-50"
+                                :class="t.completed ? 'bg-blue-500 text-white' : ''"
                                 @click="emit('toggleComplete', t.id)"
                                 :title="t.completed ? '标记未完成' : '标记完成'"
                             >
                                 <UIcon v-if="t.completed" name="i-lucide-check" class="h-3 w-3" />
                             </button>
                             <div class="flex min-w-0 flex-1 flex-col">
-                                <div
-                                    class="text-sm"
-                                    :class="
-                                        t.completed ? 'text-gray-400 line-through' : 'text-gray-900'
-                                    "
-                                >
-                                    {{ t.title }}
+                                <div class="relative min-h-[32px]">
+                                    <div
+                                        class="text-sm transition-colors"
+                                        :class="[
+                                            t.completed
+                                                ? 'text-gray-400 line-through'
+                                                : 'text-gray-900',
+                                            editingId === t.id ? 'invisible' : '',
+                                        ]"
+                                    >
+                                        {{ t.title }}
+                                    </div>
+                                    <input
+                                        v-if="editingId === t.id"
+                                        :id="`inline-input-${t.id}`"
+                                        v-model="editingValue"
+                                        class="absolute top-0 left-0 h-8 w-full rounded border border-blue-300 bg-white px-2 text-sm leading-tight shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                        @keydown.enter.stop.prevent="commitEditing(t)"
+                                        @keydown.esc.stop.prevent="cancelEditing"
+                                        @blur="commitEditing(t)"
+                                    />
                                 </div>
-                                <div class="text-xs text-gray-500">
+                                <div class="mt-0.5 text-xs text-gray-500">
                                     {{ t.time || "--:--" }} · {{ categoryIcons[t.category] }}
                                 </div>
                             </div>

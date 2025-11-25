@@ -27,6 +27,7 @@ const emit = defineEmits<{
     (e: "toggle-important", id: string): void;
     (e: "toggle-urgent", id: string): void;
     (e: "delete", id: string): void;
+    (e: "update-title", payload: { id: string; title: string }): void;
 }>();
 
 const weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -372,6 +373,7 @@ const isToday = (date: Date) => date.toDateString() === new Date().toDateString(
                 @toggleComplete="emit('toggle-complete', $event)"
                 @toggleImportant="emit('toggle-important', $event)"
                 @toggleUrgent="emit('toggle-urgent', $event)"
+                @updateTitle="emit('update-title', $event)"
                 @edit="emit('edit', $event)"
                 @delete="emit('delete', $event)"
             />

@@ -14,6 +14,8 @@ export interface ScheduleProposalPayload {
     isImportant?: boolean;
     isUrgent?: boolean;
     timezone?: string;
+    completed?: boolean;
+    metadata?: Record<string, any>;
 }
 
 export interface AiScheduleProposal {

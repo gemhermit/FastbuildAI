@@ -116,6 +116,8 @@ export class AiScheduleService {
             priority: this.guardPriority(dto.data.priority),
             isImportant: dto.data.isImportant,
             isUrgent: dto.data.isUrgent,
+            completed: dto.data.completed,
+            metadata: dto.data.metadata,
         };
 
         const created = await this.userScheduleService.createSchedule(userId, payload);
@@ -149,6 +151,8 @@ export class AiScheduleService {
             priority: this.guardPriority(dto.data.priority),
             isImportant: dto.data.isImportant,
             isUrgent: dto.data.isUrgent,
+            completed: dto.data.completed,
+            metadata: dto.data.metadata,
         };
 
         const updated = await this.userScheduleService.updateSchedule(

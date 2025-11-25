@@ -27,6 +27,11 @@ export class UserScheduleService {
     async createSchedule(userId: string, dto: CreateUserScheduleDto): Promise<UserSchedule> {
         const { startTime, endTime } = this.normalizeTimeRange(dto.startTime, dto.endTime);
 
+        const metadata = this.mergeMetadata(undefined, {
+            completed: dto.completed,
+            metadata: dto.metadata,
+        });
+
         const entity = this.repository.create({
             userId,
             title: dto.title,
@@ -40,6 +45,7 @@ export class UserScheduleService {
             location: dto.location,
             attendees: dto.attendees,
             timezone: dto.timezone,
+            metadata,
         });
 
         return this.repository.save(entity);
@@ -73,6 +79,13 @@ export class UserScheduleService {
         schedule.location = dto.location ?? schedule.location;
         schedule.attendees = dto.attendees ?? schedule.attendees;
         schedule.timezone = dto.timezone ?? schedule.timezone;
+        const metadata = this.mergeMetadata(schedule.metadata, {
+            completed: dto.completed,
+            metadata: dto.metadata,
+        });
+        if (metadata !== undefined) {
+            schedule.metadata = metadata;
+        }
 
         return this.repository.save(schedule);
     }
@@ -123,6 +136,28 @@ export class UserScheduleService {
             where,
             order: { startTime: "ASC" },
         });
+    }
+
+    private mergeMetadata(
+        existing: Record<string, any> | null | undefined,
+        incoming: { metadata?: Record<string, any>; completed?: boolean },
+    ): Record<string, any> | undefined {
+        const next = { ...(existing ?? {}) };
+        let changed = false;
+
+        if (incoming.metadata) {
+            Object.assign(next, incoming.metadata);
+            changed = true;
+        }
+
+        if (typeof incoming.completed === "boolean") {
+            next.completed = incoming.completed;
+            changed = true;
+        }
+
+        if (!changed) return existing ?? undefined;
+
+        return Object.keys(next).length ? next : undefined;
     }
 
     /**

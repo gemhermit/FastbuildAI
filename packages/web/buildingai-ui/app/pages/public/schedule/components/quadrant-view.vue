@@ -20,6 +20,7 @@ const emit = defineEmits<{
     (e: "delete", id: string): void;
     (e: "create"): void;
     (e: "openAi"): void;
+    (e: "updateTitle", payload: { id: string; title: string }): void;
 }>();
 
 const quadrants = computed(() => ({
@@ -145,6 +146,7 @@ const getQuadrantItems = (key: keyof typeof quadrants.value) => sortItems(quadra
                         @toggleComplete="emit('toggleComplete', $event)"
                         @toggleImportant="emit('toggleImportant', $event)"
                         @toggleUrgent="emit('toggleUrgent', $event)"
+                        @updateTitle="emit('updateTitle', $event)"
                         @edit="emit('edit', $event)"
                         @delete="emit('delete', $event)"
                         @create="emit('create')"

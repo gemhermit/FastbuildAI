@@ -126,34 +126,50 @@ const mockScheduleData: ScheduleItem[] = [
 const DEFAULT_EVENT_DURATION = 60 * 60 * 1000;
 const DRAFT_ID_PREFIX = "__draft__";
 
-const combineLocalDateTime = (dateStr: string, timeStr: string) => {
+const combineLocalDateTime = (dateStr: string | undefined, timeStr: string | undefined) => {
+    const normalizedDate = dateStr || formatDateLocal(new Date());
     const normalizedTime = timeStr && timeStr.length >= 4 ? timeStr : "00:00";
-    const date = new Date(`${dateStr}T${normalizedTime}`);
+    const date = new Date(`${normalizedDate}T${normalizedTime}`);
     if (Number.isNaN(date.getTime())) {
-        throw new Error("Invalid date or time");
+        console.warn("Invalid date/time detected, falling back to now", {
+            date: normalizedDate,
+            time: normalizedTime,
+        });
+        return new Date();
     }
     return date;
 };
 
 const buildScheduleRequest = (item: Omit<ScheduleItem, "id">, existing?: ScheduleItem | null) => {
-    const start = combineLocalDateTime(item.date, item.time);
+    const resolveStart = () => {
+        const candidates = [existing?.startDateTime, item.startDateTime];
+        for (const candidate of candidates) {
+            if (!candidate) continue;
+            const parsed = new Date(candidate);
+            if (!Number.isNaN(parsed.getTime())) return parsed;
+        }
+        return combineLocalDateTime(item.date, item.time);
+    };
 
-    let end: Date | undefined;
-    if (item.endTime) {
-        const parsedEnd = new Date(`${item.date}T${item.endTime}`);
-        if (!Number.isNaN(parsedEnd.getTime())) {
-            end = parsedEnd;
+    const start = resolveStart();
+
+    const resolveEnd = () => {
+        const candidates = [existing?.endDateTime, item.endDateTime];
+        for (const candidate of candidates) {
+            if (!candidate) continue;
+            const parsed = new Date(candidate);
+            if (!Number.isNaN(parsed.getTime())) return parsed;
         }
-    }
-    if (!end && existing?.endDateTime) {
-        const parsedEnd = new Date(existing.endDateTime);
-        if (!Number.isNaN(parsedEnd.getTime())) {
-            end = parsedEnd;
+        if (item.endTime) {
+            const parsedEnd = new Date(`${item.date}T${item.endTime}`);
+            if (!Number.isNaN(parsedEnd.getTime())) {
+                return parsedEnd;
+            }
         }
-    }
-    if (!end) {
-        end = new Date(start.getTime() + DEFAULT_EVENT_DURATION);
-    }
+        return new Date(start.getTime() + DEFAULT_EVENT_DURATION);
+    };
+
+    const end = resolveEnd();
 
     const combinedDescription = [item.description, item.meetingAgenda]
         .map((text) => text?.trim())
@@ -161,6 +177,11 @@ const buildScheduleRequest = (item: Omit<ScheduleItem, "id">, existing?: Schedul
         .join("\n");
 
     const attendees = item.attendees?.trim();
+
+    const metadata = {
+        ...(existing?.metadata ?? {}),
+        completed: item.completed,
+    };
 
     return {
         title: item.title,
@@ -173,6 +194,7 @@ const buildScheduleRequest = (item: Omit<ScheduleItem, "id">, existing?: Schedul
         isImportant: item.isImportant,
         isUrgent: item.isUrgent,
         timezone: existing?.timezone || browserTimezone.value,
+        metadata,
     };
 };
 
@@ -196,12 +218,13 @@ const convertProposalToScheduleItem = (proposal: ScheduleProposal): ScheduleItem
         endDateTime: data.endTime,
         priority: data.priority || "medium",
         category: data.category || "work",
-        completed: false,
+        completed: data.completed ?? false,
         isImportant: data.isImportant,
         isUrgent: data.isUrgent,
         meetingAgenda: data.description,
         attendees: data.attendees,
         timezone: data.timezone || browserTimezone.value,
+        metadata: data.metadata,
     };
 };
 
@@ -300,19 +323,58 @@ const handleProposalEdit = (proposal: ScheduleProposal) => {
     showAIChat.value = false;
 };
 
+const buildUpdatePayload = (item: ScheduleItem) => {
+    const { id: _id, ...withoutId } = item;
+    return buildScheduleRequest(withoutId, item);
+};
+
+const persistScheduleChanges = async (
+    item: ScheduleItem,
+    updates: Partial<ScheduleItem>,
+    errorMessage = "更新日程状态失败",
+) => {
+    const previous = { ...item };
+    Object.assign(item, updates);
+
+    if (item.id.startsWith(DRAFT_ID_PREFIX)) {
+        return;
+    }
+
+    try {
+        const payload = buildUpdatePayload(item);
+        const saved = await apiUpdateUserSchedule(item.id, payload);
+        upsertScheduleItem(mapEventToScheduleItem(saved));
+        fetchError.value = null;
+    } catch (err: unknown) {
+        Object.assign(item, previous);
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("Failed to update schedule", error);
+        fetchError.value = error.message || errorMessage;
+    }
+};
+
 const toggleComplete = (id: string) => {
     const item = scheduleItems.value.find((i) => i.id === id);
-    if (item) item.completed = !item.completed;
+    if (!item) return;
+    void persistScheduleChanges(item, { completed: !item.completed });
 };
 
 const toggleImportant = (id: string) => {
     const item = scheduleItems.value.find((i) => i.id === id);
-    if (item) item.isImportant = !item.isImportant;
+    if (!item) return;
+    void persistScheduleChanges(item, { isImportant: !item.isImportant });
 };
 
 const toggleUrgent = (id: string) => {
     const item = scheduleItems.value.find((i) => i.id === id);
-    if (item) item.isUrgent = !item.isUrgent;
+    if (!item) return;
+    void persistScheduleChanges(item, { isUrgent: !item.isUrgent });
+};
+
+const handleInlineTitleUpdate = (payload: { id: string; title: string }) => {
+    const item = scheduleItems.value.find((i) => i.id === payload.id);
+    if (!item) return;
+    void persistScheduleChanges(item, { title: payload.title }, "更新日程标题失败");
 };
 
 const formatTimeFromIso = (value?: string) => {
@@ -323,24 +385,34 @@ const formatTimeFromIso = (value?: string) => {
 };
 
 const mapEventToScheduleItem = (event: UserScheduleEvent): ScheduleItem => {
-    const start = new Date(event.startTime);
+    const parseSafeDate = (value?: string) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const start = parseSafeDate(event.startTime) ?? new Date();
+    const end = parseSafeDate(event.endTime);
+    const completed =
+        typeof event.completed === "boolean" ? event.completed : Boolean(event.metadata?.completed);
     return {
         id: event.id,
         title: event.title,
         description: event.description ?? "",
         date: formatDateLocal(start),
         time: formatTimeFromIso(event.startTime),
-        endTime: formatTimeFromIso(event.endTime),
-        startDateTime: event.startTime,
-        endDateTime: event.endTime,
+        endTime: formatTimeFromIso(event.endTime ?? end?.toISOString()),
+        startDateTime: parseSafeDate(event.startTime)?.toISOString(),
+        endDateTime: end?.toISOString(),
         priority: event.priority,
         category: event.category,
-        completed: false,
+        completed,
         isImportant: event.isImportant,
         isUrgent: event.isUrgent,
         meetingAgenda: event.description,
         attendees: event.attendees,
         timezone: event.timezone,
+        metadata: event.metadata,
     };
 };
 
@@ -464,12 +536,6 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button
-                        @click="showAIChat = true"
-                        class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
-                    >
-                        AI 助手
-                    </button>
-                    <button
                         @click="
                             editingItem = null;
                             showAddModal = true;
@@ -478,6 +544,13 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                     >
                         新建日程
                     </button>
+                    <button
+                        @click="showAIChat = true"
+                        class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
+                    >
+                        AI 写日程
+                    </button>
+
                     <div
                         class="flex rounded-full bg-white p-1 text-sm shadow-sm ring-1 ring-gray-200"
                     >
@@ -513,6 +586,7 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                 @toggleComplete="toggleComplete"
                 @toggleImportant="toggleImportant"
                 @toggleUrgent="toggleUrgent"
+                @updateTitle="handleInlineTitleUpdate"
                 @edit="handleEdit"
                 @delete="handleDeleteSchedule"
                 @create="
@@ -544,6 +618,7 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                 @toggle-important="toggleImportant"
                 @toggle-urgent="toggleUrgent"
                 @delete="handleDeleteSchedule"
+                @update-title="handleInlineTitleUpdate"
             />
 
             <QuadrantView
@@ -556,6 +631,7 @@ const handleAiQueryResult = (events: UserScheduleEvent[]) => {
                 @toggleComplete="toggleComplete"
                 @toggleImportant="toggleImportant"
                 @toggleUrgent="toggleUrgent"
+                @updateTitle="handleInlineTitleUpdate"
                 @edit="handleEdit"
                 @delete="handleDeleteSchedule"
                 @create="

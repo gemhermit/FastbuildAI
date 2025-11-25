@@ -75,6 +75,14 @@ export class SchedulePayloadDto {
     @IsOptional()
     @IsString()
     timezone?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    completed?: boolean;
+
+    @IsOptional()
+    @IsObject()
+    metadata?: Record<string, any>;
 }
 
 export class ExecuteScheduleDto {

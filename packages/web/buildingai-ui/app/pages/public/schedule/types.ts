@@ -17,6 +17,7 @@ export interface ScheduleItem {
     owner_id?: string;
     deadline?: string;
     timezone?: string;
+    metadata?: Record<string, any>;
 }
 
 export interface AIMessage {
