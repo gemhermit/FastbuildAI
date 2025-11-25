@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import type { ScheduleItem } from "../types";
 import ListView from "./list-view.vue";
@@ -35,6 +35,30 @@ const quadrants = computed(() => ({
 }));
 
 const sortMode = ref<"time" | "importance">("time");
+const QUADRANT_PREF_KEY = "schedule:quadrant-sort";
+
+const restoreQuadrantPrefs = () => {
+    if (typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(QUADRANT_PREF_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Partial<{ sortMode: "time" | "importance" }>;
+        if (parsed.sortMode) sortMode.value = parsed.sortMode;
+    } catch (err) {
+        console.warn("Failed to restore quadrant prefs", err);
+    }
+};
+
+const persistQuadrantPrefs = () => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(QUADRANT_PREF_KEY, JSON.stringify({ sortMode: sortMode.value }));
+};
+
+onMounted(() => {
+    restoreQuadrantPrefs();
+});
+
+watch(sortMode, persistQuadrantPrefs);
 
 const timeValue = (item: ScheduleItem) => {
     const [h = "00", m = "00"] = (item.time || "00:00").split(":");
@@ -77,7 +101,7 @@ const getQuadrantItems = (key: keyof typeof quadrants.value) => sortItems(quadra
             />
         </div>
         <div
-            class="grid flex-1 min-h-0 auto-rows-fr grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0"
+            class="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0"
         >
             <div
                 v-for="quad in [

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import { categoryIcons } from "../constants";
 import type { ScheduleItem } from "../types";
@@ -34,6 +34,42 @@ const emit = defineEmits<{
 const todoSortBy = ref<"time" | "importance">(props.sortBy ?? "time");
 const todoFilterCategory = ref<"all" | "work" | "personal" | "meeting" | "reminder">("all");
 const showCompletedInList = ref(true);
+const LIST_PREF_KEY = "schedule:list-view-prefs";
+
+const restoreListPrefs = () => {
+    if (typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(LIST_PREF_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Partial<{
+            sortBy: "time" | "importance";
+            filter: "all" | "work" | "personal" | "meeting" | "reminder";
+            showCompleted: boolean;
+        }>;
+        if (parsed.sortBy) todoSortBy.value = parsed.sortBy;
+        if (parsed.filter) todoFilterCategory.value = parsed.filter;
+        if (typeof parsed.showCompleted === "boolean")
+            showCompletedInList.value = parsed.showCompleted;
+    } catch (err) {
+        console.warn("Failed to restore list prefs", err);
+    }
+};
+
+const persistListPrefs = () => {
+    if (typeof window === "undefined") return;
+    const payload = {
+        sortBy: todoSortBy.value,
+        filter: todoFilterCategory.value,
+        showCompleted: showCompletedInList.value,
+    };
+    window.localStorage.setItem(LIST_PREF_KEY, JSON.stringify(payload));
+};
+
+onMounted(() => {
+    restoreListPrefs();
+});
+
+watch([todoSortBy, todoFilterCategory, showCompletedInList], persistListPrefs);
 
 const todayKey = computed(() => formatDateLocal(new Date()));
 const selectedKey = computed(() => formatDateLocal(props.selectedDate));

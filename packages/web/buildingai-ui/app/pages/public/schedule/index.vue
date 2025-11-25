@@ -46,8 +46,10 @@ const viewTabs = [
     { key: "calendar", label: "日历视图" },
     { key: "quadrant", label: "四象限视图" },
 ] as const;
+const PAGE_STATE_KEY = "schedule:page-state";
 
 onMounted(async () => {
+    restorePageState();
     try {
         const defaultModel = await apiGetDefaultAiModel();
         if (defaultModel?.id) {
@@ -525,6 +527,55 @@ const handleAiEventDeleted = (id: string) => {
 const handleAiQueryResult = (events: UserScheduleEvent[]) => {
     events.forEach((event) => upsertScheduleItem(mapEventToScheduleItem(event)));
 };
+
+const restorePageState = () => {
+    if (typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(PAGE_STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Partial<{
+            activeView: "list" | "calendar" | "quadrant";
+            calendarViewMode: "day" | "week" | "month";
+            selectedDate: string;
+            currentDate: string;
+            dailyGoals: Record<string, string>;
+        }>;
+        if (parsed.activeView) activeView.value = parsed.activeView;
+        if (parsed.calendarViewMode) calendarViewMode.value = parsed.calendarViewMode;
+        if (parsed.selectedDate) {
+            const d = new Date(parsed.selectedDate);
+            if (!Number.isNaN(d.getTime())) {
+                selectedDate.value = d;
+                currentDate.value = new Date(d);
+            }
+        }
+        if (parsed.currentDate) {
+            const d = new Date(parsed.currentDate);
+            if (!Number.isNaN(d.getTime())) {
+                currentDate.value = d;
+            }
+        }
+        if (parsed.dailyGoals) dailyGoals.value = parsed.dailyGoals;
+    } catch (err) {
+        console.warn("Failed to restore schedule page state", err);
+    }
+};
+
+const persistPageState = () => {
+    if (typeof window === "undefined") return;
+    const payload = {
+        activeView: activeView.value,
+        calendarViewMode: calendarViewMode.value,
+        selectedDate: selectedDate.value.toISOString(),
+        currentDate: currentDate.value.toISOString(),
+        dailyGoals: dailyGoals.value,
+    };
+    window.localStorage.setItem(PAGE_STATE_KEY, JSON.stringify(payload));
+};
+
+watch([activeView, calendarViewMode, selectedDate, currentDate, dailyGoals], persistPageState, {
+    deep: true,
+});
 </script>
 
 <template>
