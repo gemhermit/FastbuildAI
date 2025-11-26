@@ -1,3 +1,5 @@
+import type { ScheduleMetadata } from "@buildingai/service/webapi/user-schedule";
+
 export interface ScheduleItem {
     id: string;
     title: string;
@@ -17,7 +19,7 @@ export interface ScheduleItem {
     owner_id?: string;
     deadline?: string;
     timezone?: string;
-    metadata?: Record<string, any>;
+    metadata?: ScheduleMetadata;
 }
 
 export interface AIMessage {

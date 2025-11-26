@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { ScheduleProposal } from "@buildingai/service/webapi/user-schedule";
 
-defineProps<{
+const props = defineProps<{
     proposal: ScheduleProposal;
     pending?: boolean;
 }>();
+
+const hasBlockingMissingFields = computed(() => {
+    const fields = props.proposal.missingFields ?? [];
+    return fields.length > 0;
+});
 
 const emit = defineEmits<{
     (e: "confirm"): void;
@@ -94,11 +100,7 @@ const getIntentBadgeColor = (intent: ScheduleProposal["intent"]) => {
                 size="xs"
                 color="primary"
                 :loading="pending"
-                :disabled="
-                    pending ||
-                    (proposal.missingFields?.length ?? 0) > 0 ||
-                    proposal.requiresClarification
-                "
+                :disabled="pending || hasBlockingMissingFields"
                 @click="emit('confirm')"
             >
                 确认

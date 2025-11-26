@@ -33,6 +33,7 @@ const scheduleItems = ref<ScheduleItem[]>([]);
 const showAddModal = ref(false);
 const showAIChat = ref(false);
 const editingItem = ref<ScheduleItem | null>(null);
+const startWithAiMode = ref(false);
 const dailyGoals = ref<Record<string, string>>({});
 const loadingTasks = ref(false);
 const fetchError = ref<string | null>(null);
@@ -215,7 +216,7 @@ const buildScheduleRequest = (item: Omit<ScheduleItem, "id">, existing?: Schedul
 const convertProposalToScheduleItem = (proposal: ScheduleProposal): ScheduleItem => {
     const data = proposal.data;
     const startDate = data.startTime ? new Date(data.startTime) : new Date();
-    const endDate = data.endTime ? new Date(data.endTime) : undefined;
+    const _endDate = data.endTime ? new Date(data.endTime) : undefined;
     const date = formatDateLocal(startDate);
     const draftId =
         globalThis.crypto?.randomUUID?.() !== undefined
@@ -301,6 +302,7 @@ const handleSaveSchedule = async (item: Omit<ScheduleItem, "id">) => {
         upsertScheduleItem(mapEventToScheduleItem(saved));
         showAddModal.value = false;
         editingItem.value = null;
+        startWithAiMode.value = false;
     } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
         console.error("Failed to save schedule", error);
@@ -318,6 +320,7 @@ const handleDeleteSchedule = async (id: string) => {
         if (editingItem.value && editingItem.value.id === id) {
             editingItem.value = null;
             showAddModal.value = false;
+            startWithAiMode.value = false;
         }
     } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -332,6 +335,7 @@ const handleDeleteSchedule = async (id: string) => {
 
 const handleProposalEdit = (proposal: ScheduleProposal) => {
     const draft = convertProposalToScheduleItem(proposal);
+    startWithAiMode.value = false;
     editingItem.value = draft;
     showAddModal.value = true;
     showAIChat.value = false;
@@ -507,9 +511,19 @@ watch(
 );
 
 const handleEdit = (item: ScheduleItem) => {
+    startWithAiMode.value = false;
     editingItem.value = item;
     showAddModal.value = true;
 };
+
+const openScheduleModal = (useAi: boolean) => {
+    startWithAiMode.value = useAi;
+    editingItem.value = null;
+    showAddModal.value = true;
+};
+
+const openManualScheduleModal = () => openScheduleModal(false);
+const openAiScheduleModal = () => openScheduleModal(true);
 
 const setSelectedDate = (date: Date) => {
     selectedDate.value = date;
@@ -599,19 +613,16 @@ watch([activeView, calendarViewMode, selectedDate, currentDate, dailyGoals], per
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button
-                        @click="
-                            editingItem = null;
-                            showAddModal = true;
-                        "
+                        @click="openManualScheduleModal()"
                         class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700"
                     >
                         新建日程
                     </button>
                     <button
-                        @click="showAIChat = true"
+                        @click="openAiScheduleModal()"
                         class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
                     >
-                        AI 写日程
+                        AI 写待办
                     </button>
 
                     <div
@@ -652,11 +663,8 @@ watch([activeView, calendarViewMode, selectedDate, currentDate, dailyGoals], per
                 @updateTitle="handleInlineTitleUpdate"
                 @edit="handleEdit"
                 @delete="handleDeleteSchedule"
-                @create="
-                    editingItem = null;
-                    showAddModal = true;
-                "
-                @openAi="showAIChat = true"
+                @create="openManualScheduleModal()"
+                @openAi="openAiScheduleModal()"
             />
 
             <CalendarView
@@ -672,11 +680,10 @@ watch([activeView, calendarViewMode, selectedDate, currentDate, dailyGoals], per
                 @change-mode="calendarViewMode = $event"
                 @create="
                     setSelectedDate($event);
-                    editingItem = null;
-                    showAddModal = true;
+                    openManualScheduleModal();
                 "
                 @edit="handleEdit"
-                @open-ai="showAIChat = true"
+                @open-ai="openAiScheduleModal()"
                 @toggle-complete="toggleComplete"
                 @toggle-important="toggleImportant"
                 @toggle-urgent="toggleUrgent"
@@ -697,11 +704,8 @@ watch([activeView, calendarViewMode, selectedDate, currentDate, dailyGoals], per
                 @updateTitle="handleInlineTitleUpdate"
                 @edit="handleEdit"
                 @delete="handleDeleteSchedule"
-                @create="
-                    editingItem = null;
-                    showAddModal = true;
-                "
-                @openAi="showAIChat = true"
+                @create="openManualScheduleModal()"
+                @openAi="openAiScheduleModal()"
             />
         </div>
 
@@ -721,9 +725,12 @@ watch([activeView, calendarViewMode, selectedDate, currentDate, dailyGoals], per
             :editingItem="editingItem"
             :selectedDate="selectedDate"
             :saving="isSavingSchedule"
+            :startWithAi="startWithAiMode"
+            :modelId="defaultModelId || undefined"
             @close="
                 showAddModal = false;
                 editingItem = null;
+                startWithAiMode = false;
             "
             @save="handleSaveSchedule"
         />

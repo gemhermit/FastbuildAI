@@ -1,5 +1,7 @@
 export type ScheduleIntent = "create" | "update" | "delete" | "query";
 
+export type ScheduleMetadata = Record<string, unknown>;
+
 export interface UserScheduleEvent {
     id: string;
     userId: string;
@@ -17,7 +19,7 @@ export interface UserScheduleEvent {
     createdAt: string;
     updatedAt: string;
     completed?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: ScheduleMetadata;
 }
 
 export interface ScheduleProposalPayload {
@@ -33,7 +35,7 @@ export interface ScheduleProposalPayload {
     isUrgent?: boolean;
     timezone?: string;
     completed?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: ScheduleMetadata;
 }
 
 export interface ScheduleProposal {
@@ -97,7 +99,7 @@ export interface SaveUserScheduleRequest {
     isImportant?: boolean;
     isUrgent?: boolean;
     completed?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: ScheduleMetadata;
 }
 
 export function apiListUserSchedules(

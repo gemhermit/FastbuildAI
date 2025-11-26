@@ -339,6 +339,13 @@ export class AiScheduleService {
         payload: Record<string, any>,
         timezone: string,
     ): AiScheduleResponse {
+        const rawMissing = Array.isArray(payload.missing_fields)
+            ? (payload.missing_fields as string[])
+            : [];
+        const filteredMissing = rawMissing.filter(
+            (field) => field !== "endTime" && field !== "location",
+        );
+
         const proposal: AiScheduleProposal | undefined = payload.intent
             ? {
                   intent: payload.intent,
@@ -348,11 +355,9 @@ export class AiScheduleService {
                       timezone: payload.proposal?.timezone || timezone,
                   },
                   confidence: payload.confidence,
-                  missingFields: payload.missing_fields,
+                  missingFields: filteredMissing,
                   originalEventId: payload.target_event_id || undefined,
-                  requiresClarification: Array.isArray(payload.missing_fields)
-                      ? payload.missing_fields.length > 0
-                      : false,
+                  requiresClarification: filteredMissing.length > 0,
                   followUpQuestion: payload.follow_up_question || undefined,
               }
             : undefined;
